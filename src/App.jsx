@@ -6,6 +6,7 @@ import {
 } from './engine/batteryEngine';
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
+import LauncherHome from './launcher/LauncherHome';
 
 const APP_VERSION = '0.0.9';
 const POPUP_STYLES = [
@@ -41,7 +42,7 @@ function loadPos(key, fallback) {
   return fallback;
 }
 
-export default function App() {
+function BatteryApp({ onExitHome }) {
   // True Lockscreen AOD mode (zero controls shown when launched from lockscreen)
   const [isAodLocked, setIsAodLocked] = useState(() => {
     if (typeof window !== 'undefined' && window.AndroidBattery && window.AndroidBattery.isAodLaunch) {
@@ -341,6 +342,7 @@ export default function App() {
       {/* Top minimal HUD (hidden completely in Lockscreen AOD mode) */}
       {showControls && (
         <div className="hud-top">
+          {onExitHome && <button className="hud-pill" onClick={onExitHome}>OSIEN Home</button>}
           <button className={`hud-pill ${isLight ? 'light-surface' : ''}`} onClick={() => setSheetTab('aod')}>
             <img src="/logo.png" alt="OSIEN" style={{ width: 18, height: 18, borderRadius: 5, objectFit: 'cover' }} />
             <span style={{ fontWeight: 600 }}>OSIEN Launcher</span>
@@ -921,4 +923,27 @@ export default function App() {
       )}
     </div>
   );
+}
+
+export default function App() {
+  const [view, setView] = useState(() => {
+    const aod = Boolean(window.AndroidBattery?.isAodLaunch?.());
+    const battery = new URLSearchParams(window.location.search).get('view') === 'battery';
+    return aod || battery ? 'battery' : 'home';
+  });
+
+  useEffect(() => {
+    const onLaunchMode = (event) => setView(event.detail?.aod ? 'battery' : 'home');
+    const onBattery = () => setView('battery');
+    window.addEventListener('osien-launch-mode', onLaunchMode);
+    window.addEventListener('osien-open-battery', onBattery);
+    return () => {
+      window.removeEventListener('osien-launch-mode', onLaunchMode);
+      window.removeEventListener('osien-open-battery', onBattery);
+    };
+  }, []);
+
+  return view === 'battery'
+    ? <BatteryApp onExitHome={() => setView('home')} />
+    : <LauncherHome />;
 }

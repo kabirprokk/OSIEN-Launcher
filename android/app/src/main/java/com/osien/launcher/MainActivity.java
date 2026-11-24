@@ -2,10 +2,15 @@ package com.osien.launcher;
 
 import android.app.DownloadManager;
 import android.app.KeyguardManager;
+import android.app.role.RoleManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.LauncherApps;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.content.SharedPreferences;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -17,6 +22,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.PowerManager;
+import android.os.Process;
 import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsets;
@@ -26,7 +32,10 @@ import android.webkit.JavascriptInterface;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.BridgeActivity;
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.util.concurrent.ConcurrentHashMap;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 public class MainActivity extends BridgeActivity implements SensorEventListener {
 
@@ -35,25 +44,18 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private boolean isInPocket = false;
     private float userBrightness = -1f; // -1 = system default
     private boolean launchedFromAod = false;
+    private boolean launchedAsHome = false;
+    private volatile boolean backHandlingEnabled = false;
+    private final java.util.Map<String, String> appIconCache = new ConcurrentHashMap<>();
     private BroadcastReceiver unlockReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         launchedFromAod = getIntent() != null && getIntent().getBooleanExtra("from_aod", false);
+        launchedAsHome = isHomeIntent(getIntent());
 
-        // True Always-On Display (AOD) over Lockscreen
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        }
-        getWindow().addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-        );
-
-        enterImmersiveMode();
+        configureWindowForMode();
 
         // Proximity sensor for Pocket Mode (turns display black when in pocket/bag)
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -109,19 +111,72 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         super.onNewIntent(intent);
         setIntent(intent);
         launchedFromAod = intent != null && intent.getBooleanExtra("from_aod", false);
+        launchedAsHome = isHomeIntent(intent);
+        configureWindowForMode();
         if (this.bridge != null && this.bridge.getWebView() != null) {
             final boolean isAod = launchedFromAod;
             runOnUiThread(() -> this.bridge.getWebView().evaluateJavascript(
                 "window.dispatchEvent(new CustomEvent('osien-aod-mode', { detail: " + isAod + " }));",
                 null
             ));
+            runOnUiThread(() -> this.bridge.getWebView().evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('osien-launch-mode', { detail: { home: " + launchedAsHome + ", aod: " + isAod + " } }));",
+                null
+            ));
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (backHandlingEnabled && this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().evaluateJavascript(
+                "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));", null);
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private boolean isHomeIntent(Intent intent) {
+        return intent != null && Intent.ACTION_MAIN.equals(intent.getAction())
+            && intent.hasCategory(Intent.CATEGORY_HOME);
+    }
+
+    private void configureWindowForMode() {
+        if (launchedFromAod) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            }
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            enterImmersiveMode();
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(false);
+                setTurnScreenOn(false);
+            }
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            showSystemBars();
+        }
+    }
+
+    private void showSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) controller.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (sensorManager != null && proximitySensor != null) {
+        if (launchedFromAod && sensorManager != null && proximitySensor != null) {
             sensorManager.registerListener(this, proximitySensor, SensorManager.SENSOR_DELAY_NORMAL);
         }
     }
@@ -136,7 +191,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
+        if (launchedFromAod && event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
             boolean near = event.values[0] < Math.min(event.sensor.getMaximumRange(), 3.0f);
             if (near != isInPocket) {
                 isInPocket = near;
@@ -159,7 +214,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
+        if (hasFocus && launchedFromAod) {
             enterImmersiveMode();
         }
     }
@@ -186,6 +241,160 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     }
 
     public class AndroidBatteryBridge {
+        @JavascriptInterface
+        public void setBackHandlingEnabled(boolean enabled) {
+            backHandlingEnabled = enabled;
+        }
+
+        @JavascriptInterface
+        public boolean isHomeRoleHeld() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
+                return rm != null && rm.isRoleHeld(RoleManager.ROLE_HOME);
+            }
+            Intent homeIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            android.content.pm.ResolveInfo resolved = getPackageManager().resolveActivity(
+                homeIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+            return resolved != null && resolved.activityInfo != null
+                && getPackageName().equals(resolved.activityInfo.packageName);
+        }
+
+        @JavascriptInterface
+        public void requestHomeRole() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
+                    if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME))
+                        startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME));
+                } else {
+                    try { startActivity(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)); }
+                    catch (Exception ignored) { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String getLaunchableApps() {
+            JSONArray result = new JSONArray();
+            LauncherApps launcherApps = (LauncherApps) getSystemService(LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) return result.toString();
+            try {
+                java.util.List<android.content.pm.LauncherActivityInfo> activities = launcherApps.getActivityList(null, Process.myUserHandle());
+                java.util.Collections.sort(activities, (a, b) -> a.getLabel().toString().compareToIgnoreCase(b.getLabel().toString()));
+                for (android.content.pm.LauncherActivityInfo info : activities) {
+                    JSONObject app = new JSONObject();
+                    app.put("packageName", info.getApplicationInfo().packageName);
+                    app.put("className", info.getComponentName().getClassName());
+                    app.put("label", info.getLabel().toString());
+                    result.put(app);
+                }
+            } catch (Exception ignored) {}
+            return result.toString();
+        }
+
+        @JavascriptInterface
+        public String getAppIcon(String packageName, String className) {
+            String key = packageName + "/" + className;
+            String cached = appIconCache.get(key);
+            if (cached != null) return cached;
+            LauncherApps launcherApps = (LauncherApps) getSystemService(LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) return "";
+            try {
+                for (android.content.pm.LauncherActivityInfo info : launcherApps.getActivityList(packageName, Process.myUserHandle())) {
+                    if (!className.equals(info.getComponentName().getClassName())) continue;
+                    Drawable icon = info.getBadgedIcon(0);
+                    Bitmap bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(bitmap);
+                    icon.setBounds(0, 0, 64, 64);
+                    icon.draw(canvas);
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes);
+                    bitmap.recycle();
+                    String encoded = "data:image/png;base64," + android.util.Base64.encodeToString(bytes.toByteArray(), android.util.Base64.NO_WRAP);
+                    appIconCache.put(key, encoded);
+                    return encoded;
+                }
+            } catch (Exception ignored) {}
+            return "";
+        }
+
+        @JavascriptInterface
+        public void launchApp(String packageName, String className) {
+            runOnUiThread(() -> {
+                try {
+                    LauncherApps launcherApps = (LauncherApps) getSystemService(LAUNCHER_APPS_SERVICE);
+                    if (launcherApps != null) launcherApps.startMainActivity(
+                        new android.content.ComponentName(packageName, className), Process.myUserHandle(), null, null);
+                } catch (Exception ignored) {}
+            });
+        }
+
+        @JavascriptInterface
+        public void openSystemPanel(String panel) {
+            runOnUiThread(() -> {
+                Intent intent = null;
+                if ("internet".equals(panel)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+                        intent = new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY);
+                    else intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                }
+                else if ("wifi".equals(panel)) intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
+                else if ("bluetooth".equals(panel)) intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                else if ("display".equals(panel)) intent = new Intent(Settings.ACTION_DISPLAY_SETTINGS);
+                else if ("sound".equals(panel) || "volume".equals(panel)) intent = new Intent(Settings.ACTION_SOUND_SETTINGS);
+                if (intent != null) try { startActivity(intent); } catch (Exception ignored) {}
+            });
+        }
+
+        @JavascriptInterface
+        public boolean canWriteSystemSettings() {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.System.canWrite(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public int getSystemBrightness() {
+            try {
+                int raw = Settings.System.getInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
+                return Math.max(5, Math.min(100, Math.round(raw * 100f / 255f)));
+            } catch (Exception ignored) { return -1; }
+        }
+
+        @JavascriptInterface
+        public void clearHomeBrightness() {
+            runOnUiThread(() -> {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                if (lp.screenBrightness != -1f) {
+                    lp.screenBrightness = -1f;
+                    getWindow().setAttributes(lp);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void requestSystemSettingsPermission() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) runOnUiThread(() -> {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            });
+        }
+
+        @JavascriptInterface
+        public void setSystemBrightness(int percent) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(MainActivity.this)) return;
+            try { Settings.System.putInt(getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, Math.max(5, Math.min(100, percent)) * 255 / 100); }
+            catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void setHomeBrightness(float level) {
+            if (launchedFromAod) return;
+            runOnUiThread(() -> {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.screenBrightness = Math.max(0.05f, Math.min(1f, level));
+                getWindow().setAttributes(lp);
+            });
+        }
+
         @JavascriptInterface
         public boolean isAodLaunch() {
             return launchedFromAod;

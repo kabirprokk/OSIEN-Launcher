@@ -31,7 +31,7 @@ function nativeChargeState(data) {
  * counter divided by the capacity selected by the user; Android itself generally
  * exposes only whole-number SOC on consumer devices.
  */
-export function useBatteryTelemetry({ capacityMah = 5000 } = {}) {
+export function useBatteryTelemetry({ capacityMah = 5000, enabled = true } = {}) {
   const [telemetry, setTelemetry] = useState(EMPTY_TELEMETRY);
   const [hardwareSupported, setHardwareSupported] = useState(false);
   const historyRef = useRef([]);
@@ -39,6 +39,11 @@ export function useBatteryTelemetry({ capacityMah = 5000 } = {}) {
   capacityRef.current = capacityMah;
 
   useEffect(() => {
+    if (!enabled) {
+      setTelemetry(EMPTY_TELEMETRY);
+      setHardwareSupported(false);
+      return undefined;
+    }
     let active = true;
     let battery = null;
     let timer = null;
@@ -101,7 +106,9 @@ export function useBatteryTelemetry({ capacityMah = 5000 } = {}) {
     };
 
     if (typeof window !== 'undefined' && readAndroid()) {
-      timer = window.setInterval(readAndroid, 250);
+      // One sample per second is responsive enough for the display and avoids
+      // rerendering the launcher four times a second while its battery panel is closed.
+      timer = window.setInterval(readAndroid, 1000);
     } else if (typeof navigator !== 'undefined' && typeof navigator.getBattery === 'function') {
       navigator.getBattery().then((b) => {
         if (!active) return;
@@ -124,7 +131,7 @@ export function useBatteryTelemetry({ capacityMah = 5000 } = {}) {
         battery.removeEventListener('chargingchange', readBrowser);
       }
     };
-  }, []);
+  }, [enabled]);
 
   return { telemetry, hardwareSupported };
 }
