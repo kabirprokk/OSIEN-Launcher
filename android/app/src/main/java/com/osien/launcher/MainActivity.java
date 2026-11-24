@@ -1,4 +1,4 @@
-package com.voltpulse.app;
+package com.osien.launcher;
 
 import android.app.DownloadManager;
 import android.app.KeyguardManager;
@@ -343,11 +343,11 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             runOnUiThread(() -> {
                 try {
                     File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                    File apkFile = new File(dir, "OSIEN-Volt-update.apk");
+                    File apkFile = new File(dir, "OSIEN-Launcher-update.apk");
                     if (apkFile.exists()) apkFile.delete();
 
                     DownloadManager.Request req = new DownloadManager.Request(Uri.parse(apkUrl));
-                    req.setTitle("OSIEN Volt Update");
+                    req.setTitle("OSIEN Launcher Update");
                     req.setDescription("Downloading latest release...");
                     req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
                     req.setDestinationUri(Uri.fromFile(apkFile));
@@ -412,8 +412,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 int status = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1) : -1;
                 int plugged = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) : 0;
 
-                long currentRaw = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) : 0;
-                double currentMa = Math.abs(currentRaw) > 10000 ? (Math.abs(currentRaw) / 1000.0) : Math.abs(currentRaw);
+                long currentRaw = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) : Long.MIN_VALUE;
+                long chargeCounterUah = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER) : Long.MIN_VALUE;
+                double currentMa = currentRaw != Long.MIN_VALUE ? Math.abs(currentRaw) / 1000.0 : -1;
 
                 double pct = (level >= 0 && scale > 0) ? (level * 100.0 / scale) : -1;
 
@@ -422,7 +423,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 boolean isFull = status == BatteryManager.BATTERY_STATUS_FULL || pct >= 100.0;
                 boolean isSmartPaused = isPlugged && !isFull && (
                     status == BatteryManager.BATTERY_STATUS_NOT_CHARGING ||
-                    (pct >= 79.0 && currentRaw != 0 && currentMa <= 25.0)
+                    (pct >= 79.0 && currentRaw != Long.MIN_VALUE && currentRaw != 0 && currentMa <= 25.0)
                 );
                 boolean charging = (status == BatteryManager.BATTERY_STATUS_CHARGING) && !isSmartPaused && !isFull;
 
@@ -438,6 +439,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 json.put("chargeState", chargeState);
                 json.put("voltageV", voltageMv / 1000.0);
                 json.put("currentMa", currentMa);
+                json.put("chargeCounterUah", chargeCounterUah);
                 json.put("tempC", tempTenths / 10.0);
                 json.put("inPocket", isInPocket);
                 return json.toString();

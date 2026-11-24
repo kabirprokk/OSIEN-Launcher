@@ -1,4 +1,4 @@
-package com.voltpulse.app;
+package com.osien.launcher;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -32,7 +32,7 @@ public class ChargingMonitorService extends Service {
     private static final String CHANNEL_ID = "osien_launcher_aod_channel";
     private static final int NOTIF_ID = 1001;
     public static final String PREFS_NAME = "voltpulse_aod_prefs";
-    public static final String ACTION_TEST_POPUP = "com.voltpulse.app.TEST_POPUP";
+    public static final String ACTION_TEST_POPUP = "com.osien.launcher.TEST_POPUP";
 
     private BroadcastReceiver screenAndPowerReceiver;
     private long lastLaunchMs = 0;
@@ -111,15 +111,15 @@ public class ChargingMonitorService extends Service {
         // Read live battery % & power
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         Intent bs = context.registerReceiver(null, ifilter);
-        int level = bs != null ? bs.getIntExtra(BatteryManager.EXTRA_LEVEL, 58) : 58;
+        int level = bs != null ? bs.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) : 0;
         int scale = bs != null ? bs.getIntExtra(BatteryManager.EXTRA_SCALE, 100) : 100;
-        int voltageMv = bs != null ? bs.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 4000) : 4000;
+        int voltageMv = bs != null ? bs.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) : 0;
         int pct = (scale > 0) ? Math.round(level * 100f / scale) : level;
         BatteryManager bm = (BatteryManager) context.getSystemService(BATTERY_SERVICE);
-        long rawMa = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) : 0;
-        double ma = Math.abs(rawMa) > 10000 ? (Math.abs(rawMa) / 1000.0) : Math.abs(rawMa);
+        long rawUa = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) : Long.MIN_VALUE;
+        double ma = rawUa != Long.MIN_VALUE ? Math.abs(rawUa) / 1000.0 : -1;
         double watts = (voltageMv / 1000.0) * (ma / 1000.0);
-        String pwrText = watts > 1.5 ? String.format("%.1fW", watts) : "CHARGING";
+        String pwrText = voltageMv > 0 && ma >= 0 ? String.format("%.3fW", watts) : "CHARGING";
 
         WindowManager wm = (WindowManager) context.getSystemService(WINDOW_SERVICE);
         if (wm == null) return;
@@ -259,7 +259,7 @@ public class ChargingMonitorService extends Service {
             if (pm != null) {
                 PowerManager.WakeLock wl = pm.newWakeLock(
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                    "OSIENLauncher:AodWakeLock"
+                    "OsienLauncher:AodWakeLock"
                 );
                 wl.acquire(4000);
             }

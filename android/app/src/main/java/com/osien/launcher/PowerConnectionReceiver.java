@@ -1,4 +1,4 @@
-package com.voltpulse.app;
+package com.osien.launcher;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

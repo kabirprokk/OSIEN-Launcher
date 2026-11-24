@@ -2,9 +2,10 @@ import React from 'react';
 import { splitPct } from '../engine/batteryEngine';
 
 function statusText(t) {
+  if (t.chargeState === 'unknown') return 'BATTERY DATA UNAVAILABLE';
   if (t.chargeState === 'paused') return 'SMART LIMIT · PAUSED';
   if (t.chargeState === 'full') return 'FULLY CHARGED';
-  if (t.chargeState === 'charging') return `${t.watts.toFixed(1)}W · CHARGING`;
+  if (t.chargeState === 'charging') return `${t.watts === null ? '—' : `${t.watts.toFixed(3)}W`} · CHARGING`;
   return 'ON BATTERY';
 }
 
@@ -24,11 +25,9 @@ function TelemetryHairline({ t, show, light = false }) {
         color,
       }}
     >
-      {t.chargeState === 'charging' && <span>{t.vIn.toFixed(1)}V</span>}
-      {t.chargeState === 'charging' && <span>·</span>}
-      <span>{t.chargeState === 'charging' ? `${t.iInMa}mA` : `${t.iBatMa}mA`}</span>
-      <span>·</span>
-      <span>{t.vBat.toFixed(3)}V</span>
+      {t.vBat !== null && <span>{t.vBat.toFixed(3)}V</span>}
+      {t.iBatMa !== null && <span>{t.iBatMa.toFixed(3)}mA</span>}
+      {t.watts !== null && <span>{t.watts.toFixed(3)}W</span>}
     </div>
   );
 }

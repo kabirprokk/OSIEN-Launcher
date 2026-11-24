@@ -7,7 +7,7 @@ import {
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.8';
+const APP_VERSION = '0.0.9';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -16,7 +16,7 @@ const POPUP_STYLES = [
   { id: 'dock', label: 'Bottom Dock' },
   { id: 'float', label: 'Pure Float' },
 ];
-const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
+const RELEASES_API = 'https://api.github.com/repos/kabirprokk/OSIEN-Launcher/releases/latest';
 
 function isNewerVersion(latestTag, current) {
   const a = latestTag.replace(/^v/i, '').split('.').map(Number);
@@ -231,10 +231,7 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const { telemetry } = useBatteryTelemetry({
-    mode: 'auto',
-    capacityMah,
-  });
+  const { telemetry } = useBatteryTelemetry({ capacityMah });
 
   const activeTemplate = TEMPLATES[tplIndex];
   const TemplateComponent = activeTemplate.component;
@@ -625,7 +622,7 @@ export default function App() {
               <div style={{ fontSize: 18, fontWeight: 600 }}>Quick Setup · OSIEN Launcher</div>
             </div>
             <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 18, lineHeight: 1.5 }}>
-              Enable these 2 Android permissions so OSIEN Volt can show automatically over your lockscreen when your screen turns off.
+              Enable these 2 Android permissions so OSIEN Launcher can show automatically over your lockscreen when your screen turns off.
             </div>
 
             <div className="toggle-row">
@@ -892,7 +889,23 @@ export default function App() {
                 </div>
 
                 <div className="sheet-section">
-                  <div className="sheet-label">Battery Capacity (exact coulomb math)</div>
+                  <div className="sheet-label">Battery Capacity (for precise percentage)</div>
+                  <div style={{ fontSize: 11, color: '#71717a', marginBottom: 10 }}>
+                    The Android charge counter is divided by this capacity. Use your battery's full-charge capacity for the closest percentage.
+                  </div>
+                  <input
+                    type="number"
+                    min="1000"
+                    max="20000"
+                    step="50"
+                    value={capacityMah}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (Number.isFinite(value) && value >= 1000 && value <= 20000) setCapacityMah(value);
+                    }}
+                    className="text-input"
+                    aria-label="Battery capacity in milliamp-hours"
+                  />
                   <div className="chip-grid">
                     {CAPACITY_PRESETS.map((cap) => (
                       <button key={cap} className={`opt-btn ${capacityMah === cap ? 'active' : ''}`} onClick={() => setCapacityMah(cap)}>

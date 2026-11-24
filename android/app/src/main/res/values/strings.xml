@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">OSIEN Launcher</string>
     <string name="title_activity_main">OSIEN Launcher</string>
-    <string name="package_name">com.voltpulse.app</string>
-    <string name="custom_url_scheme">com.voltpulse.app</string>
+    <string name="package_name">com.osien.launcher</string>
+    <string name="custom_url_scheme">com.osien.launcher</string>
 </resources>

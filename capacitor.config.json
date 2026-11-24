@@ -1,5 +1,5 @@
 {
-  "appId": "com.voltpulse.app",
+  "appId": "com.osien.launcher",
   "appName": "OSIEN Launcher",
   "webDir": "dist",
   "android": {
