@@ -8,7 +8,7 @@ import {
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.3';
+const APP_VERSION = '0.0.4';
 const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
 
 function isNewerVersion(latestTag, current) {
@@ -82,6 +82,31 @@ export default function App() {
   const [burnInOffset, setBurnInOffset] = useState({ x: 0, y: 0 });
   const [updateInfo, setUpdateInfo] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [permStatus, setPermStatus] = useState({ overlay: true, battery: true, install: true });
+  const [setupDismissed, setSetupDismissed] = useState(false);
+
+  // Check native Android permissions on launch & whenever returning from Android Settings
+  useEffect(() => {
+    const checkPerms = () => {
+      if (typeof window !== 'undefined' && window.AndroidBattery && window.AndroidBattery.getPermissionStatus) {
+        try {
+          const parsed = JSON.parse(window.AndroidBattery.getPermissionStatus());
+          setPermStatus(parsed);
+        } catch {
+          // Ignore
+        }
+      }
+    };
+    checkPerms();
+    window.addEventListener('focus', checkPerms);
+    document.addEventListener('visibilitychange', checkPerms);
+    return () => {
+      window.removeEventListener('focus', checkPerms);
+      document.removeEventListener('visibilitychange', checkPerms);
+    };
+  }, []);
+
+  const needsSetup = !isAodLocked && !setupDismissed && (!permStatus.overlay || !permStatus.battery);
 
   const lastTapRef = useRef(0);
   const touchStartX = useRef(null);
@@ -483,6 +508,68 @@ export default function App() {
 
       {/* Hidden file input for custom background photo */}
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
+
+      {/* Guided First-Run Setup Wizard (auto-appears until Always-on-Top & Battery permissions are granted) */}
+      {needsSetup && (
+        <div className="sheet-backdrop" style={{ alignItems: 'center', padding: 20 }}>
+          <div className="sheet-panel" style={{ borderRadius: 24, padding: 24, maxWidth: 380 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Quick Setup · OSIEN Volt</div>
+            <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 18, lineHeight: 1.5 }}>
+              Enable these 2 Android permissions so OSIEN Volt can show automatically over your lockscreen when your screen turns off.
+            </div>
+
+            <div className="toggle-row">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>1. Display Over Other Apps</div>
+                <div style={{ fontSize: 11, color: '#71717a' }}>Required for Lockscreen AOD</div>
+              </div>
+              <button
+                className={`opt-btn ${permStatus.overlay ? '' : 'active'}`}
+                style={{ padding: '6px 14px' }}
+                onClick={() => window.AndroidBattery && window.AndroidBattery.requestOverlayPermission()}
+              >
+                {permStatus.overlay ? '✓ Done' : 'Allow'}
+              </button>
+            </div>
+
+            <div className="toggle-row">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>2. Unrestricted Battery</div>
+                <div style={{ fontSize: 11, color: '#71717a' }}>Keeps AOD active in background</div>
+              </div>
+              <button
+                className={`opt-btn ${permStatus.battery ? '' : 'active'}`}
+                style={{ padding: '6px 14px' }}
+                onClick={() => window.AndroidBattery && window.AndroidBattery.requestBatteryPermission()}
+              >
+                {permStatus.battery ? '✓ Done' : 'Allow'}
+              </button>
+            </div>
+
+            <div className="toggle-row">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>3. Auto-Updates (Optional)</div>
+                <div style={{ fontSize: 11, color: '#71717a' }}>Allow installing future OTA releases</div>
+              </div>
+              <button
+                className={`opt-btn ${permStatus.install ? '' : 'active'}`}
+                style={{ padding: '6px 14px' }}
+                onClick={() => window.AndroidBattery && window.AndroidBattery.requestInstallPermission()}
+              >
+                {permStatus.install ? '✓ Done' : 'Allow'}
+              </button>
+            </div>
+
+            <button
+              className="opt-btn"
+              style={{ width: '100%', marginTop: 12, textAlign: 'center' }}
+              onClick={() => setSetupDismissed(true)}
+            >
+              Skip for now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Customizer & AOD Bottom Sheet */}
       {showControls && sheetTab && (

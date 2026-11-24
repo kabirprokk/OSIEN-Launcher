@@ -4,4 +4,5 @@ android/app/build/
 android/.gradle/
 android/build/
 *.apk
+*.jks
 .DS_Store

@@ -172,6 +172,65 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         }
 
         @JavascriptInterface
+        public String getPermissionStatus() {
+            try {
+                boolean overlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(MainActivity.this);
+                boolean battery = true;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                    battery = pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+                }
+                boolean install = Build.VERSION.SDK_INT < Build.VERSION_CODES.O || getPackageManager().canRequestPackageInstalls();
+                JSONObject obj = new JSONObject();
+                obj.put("overlay", overlay);
+                obj.put("battery", battery);
+                obj.put("install", install);
+                return obj.toString();
+            } catch (Exception e) {
+                return "{\"overlay\":true,\"battery\":true,\"install\":true}";
+            }
+        }
+
+        @JavascriptInterface
+        public void requestOverlayPermission() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Intent intent = new Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void requestBatteryPermission() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Intent intent = new Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void requestInstallPermission() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    Intent intent = new Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName())
+                    );
+                    startActivity(intent);
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void requestAodPermissions() {
             runOnUiThread(() -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(MainActivity.this)) {
