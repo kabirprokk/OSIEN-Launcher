@@ -1,17 +1,17 @@
 {
-  "name": "OSIEN Volt",
-  "short_name": "OSIEN Volt",
-  "description": "Precision live charging & Always-On Display with exact coulomb telemetry and minimal animated templates.",
+  "name": "OSIEN Launcher",
+  "short_name": "OSIEN Launcher",
+  "description": "Minimal Always-On Display, precision live charging, and customizable lockscreen studio for Android.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#000000",
+  "theme_color": "#030722",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

@@ -7,7 +7,7 @@ import {
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.7';
+const APP_VERSION = '0.0.8';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -345,7 +345,7 @@ export default function App() {
       {showControls && (
         <div className="hud-top">
           <button className={`hud-pill ${isLight ? 'light-surface' : ''}`} onClick={() => setSheetTab('aod')}>
-            <span className={`hud-dot ${telemetry.source === 'simulated' ? 'sim' : ''}`} />
+            <img src="/logo.png" alt="OSIEN" style={{ width: 18, height: 18, borderRadius: 5, objectFit: 'cover' }} />
             <span style={{ fontWeight: 600 }}>OSIEN Launcher</span>
             <span style={{ opacity: 0.45 }}>·</span>
             <span>{editLayout ? 'Drag Widgets' : activeTemplate.name}</span>
@@ -620,7 +620,10 @@ export default function App() {
       {needsSetup && (
         <div className="sheet-backdrop" style={{ alignItems: 'center', padding: 20 }}>
           <div className="sheet-panel" style={{ borderRadius: 24, padding: 24, maxWidth: 380 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Quick Setup · OSIEN Launcher</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <img src="/logo.png" alt="OSIEN" style={{ width: 32, height: 32, borderRadius: 9, objectFit: 'cover' }} />
+              <div style={{ fontSize: 18, fontWeight: 600 }}>Quick Setup · OSIEN Launcher</div>
+            </div>
             <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 18, lineHeight: 1.5 }}>
               Enable these 2 Android permissions so OSIEN Volt can show automatically over your lockscreen when your screen turns off.
             </div>
