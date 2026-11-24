@@ -193,18 +193,27 @@ export function useBatteryTelemetry({
         if (isCharging) {
           // Blend learned real tick rate with exact coulomb rate
           pctPerSec = learnedRateRef.current
-            ? learnedRateRef.current * 0.55 + coulombPctPerSec * 0.45
-            : coulombPctPerSec;
-          const nextPct = pctRef.current + pctPerSec * DT_SEC;
-          pctRef.current = Math.max(hwLevel, Math.min(Math.min(100, hwLevel + 0.99), nextPct));
+            ? learnedRateRef.current * 0.65 + coulombPctPerSec * 0.35
+            : Math.max(0.004, coulombPctPerSec);
+
+          // Asymptotic damping near hwLevel + 0.999 so live decimals NEVER freeze dead while awaiting OS integer tick
+          const ceiling = Math.min(100, hwLevel + 0.999);
+          const remaining = Math.max(0, ceiling - pctRef.current);
+          const rawStep = pctPerSec * DT_SEC;
+          const dampedStep = remaining < 0.15 ? Math.min(rawStep, Math.max(0.0002, remaining * 0.035)) : rawStep;
+          const nextPct = pctRef.current + dampedStep;
+          pctRef.current = Math.max(hwLevel, Math.min(ceiling, nextPct));
         } else if (isPausedOrFull) {
           // Smart Charging paused (e.g. 85%) or Full (100%) -> freeze cleanly!
           pctPerSec = 0;
           pctRef.current = hwLevel;
         } else {
-          pctPerSec = -coulombPctPerSec;
-          const nextPct = pctRef.current + pctPerSec * DT_SEC;
-          pctRef.current = Math.max(Math.max(0, hwLevel - 0.99), Math.min(hwLevel, nextPct));
+          pctPerSec = -Math.max(0.0005, coulombPctPerSec);
+          const floor = Math.max(0, hwLevel - 0.999);
+          const remaining = Math.max(0, pctRef.current - floor);
+          const rawStep = Math.abs(pctPerSec) * DT_SEC;
+          const dampedStep = remaining < 0.15 ? Math.min(rawStep, Math.max(0.0001, remaining * 0.035)) : rawStep;
+          pctRef.current = Math.max(floor, Math.min(hwLevel, pctRef.current - dampedStep));
         }
 
         const vInReal = isCharging ? (realWatts > 22 ? 11.0 : realWatts > 12 ? 9.0 : 5.0) : 0;

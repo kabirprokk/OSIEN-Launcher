@@ -8,7 +8,7 @@ import {
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.4';
+const APP_VERSION = '0.0.5';
 const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
 
 function isNewerVersion(latestTag, current) {
@@ -64,9 +64,16 @@ export default function App() {
   const [customBgUrl, setCustomBgUrl] = useState(() => localStorage.getItem('ov_custom_bg') || '');
   const [bgDim, setBgDim] = useState(() => Number(localStorage.getItem('ov_bg_dim') ?? 45));
 
-  // Drag-and-drop widget offsets (in px relative to default position)
+  // Drag-and-drop + scale widget state (Clock, Battery, Custom Signature)
   const [clockPos, setClockPos] = useState(() => loadPos('ov_pos_clock', { x: 0, y: 0 }));
   const [batPos, setBatPos] = useState(() => loadPos('ov_pos_bat', { x: 0, y: 0 }));
+  const [sigPos, setSigPos] = useState(() => loadPos('ov_pos_sig', { x: 0, y: 0 }));
+  const [clockScale, setClockScale] = useState(() => Number(localStorage.getItem('ov_sc_clock') || 100));
+  const [batScale, setBatScale] = useState(() => Number(localStorage.getItem('ov_sc_bat') || 100));
+  const [sigScale, setSigScale] = useState(() => Number(localStorage.getItem('ov_sc_sig') || 100));
+  const [sigText, setSigText] = useState(() => localStorage.getItem('ov_sig_text') || 'OSIEN');
+  const [showSig, setShowSig] = useState(() => localStorage.getItem('ov_sig_show') === 'true');
+  const [selectedWidget, setSelectedWidget] = useState('bat'); // 'clock' | 'bat' | 'sig'
   const dragRef = useRef(null);
 
   // AOD & Calibration state
@@ -176,6 +183,12 @@ export default function App() {
     localStorage.setItem('ov_bg_dim', String(bgDim));
     localStorage.setItem('ov_pos_clock', JSON.stringify(clockPos));
     localStorage.setItem('ov_pos_bat', JSON.stringify(batPos));
+    localStorage.setItem('ov_pos_sig', JSON.stringify(sigPos));
+    localStorage.setItem('ov_sc_clock', String(clockScale));
+    localStorage.setItem('ov_sc_bat', String(batScale));
+    localStorage.setItem('ov_sc_sig', String(sigScale));
+    localStorage.setItem('ov_sig_text', sigText);
+    localStorage.setItem('ov_sig_show', String(showSig));
     localStorage.setItem('ov_charger', chargerId);
     localStorage.setItem('ov_cap', String(capacityMah));
     localStorage.setItem('ov_aod_on', String(aodEnabled));
@@ -190,7 +203,7 @@ export default function App() {
         // Ignore
       }
     }
-  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, chargerId, capacityMah, aodEnabled, aodChargingOnly, aodBrightness]);
+  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, chargerId, capacityMah, aodEnabled, aodChargingOnly, aodBrightness]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -250,11 +263,12 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Drag-and-drop handlers for Edit Layout mode
+  // Drag-and-drop handlers for Studio Edit Mode
   const startDrag = (target, e) => {
     if (!editLayout) return;
     e.stopPropagation();
-    const startPos = target === 'clock' ? clockPos : batPos;
+    setSelectedWidget(target);
+    const startPos = target === 'clock' ? clockPos : target === 'sig' ? sigPos : batPos;
     dragRef.current = {
       target,
       startX: e.clientX,
@@ -273,6 +287,7 @@ export default function App() {
       y: Math.round(origY + (e.clientY - startY)),
     };
     if (target === 'clock') setClockPos(next);
+    else if (target === 'sig') setSigPos(next);
     else setBatPos(next);
   };
 
@@ -421,7 +436,7 @@ export default function App() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        {/* Draggable Clock Widget */}
+        {/* Draggable & Scalable Clock Widget */}
         {clockStyle !== 'off' && (
           <div
             onPointerDown={(e) => startDrag('clock', e)}
@@ -432,10 +447,11 @@ export default function App() {
               top: 'calc(var(--safe-top) + 74px)',
               left: 0,
               right: 0,
-              zIndex: 20,
+              zIndex: 22,
               display: 'flex',
               justifyContent: 'center',
-              transform: `translate(${clockPos.x}px, ${clockPos.y}px)`,
+              pointerEvents: editLayout ? 'auto' : 'none',
+              transform: `translate(${clockPos.x}px, ${clockPos.y}px) scale(${clockScale / 100})`,
               touchAction: editLayout ? 'none' : 'auto',
               cursor: editLayout ? 'grab' : 'default',
             }}
@@ -443,7 +459,12 @@ export default function App() {
             <div
               style={
                 editLayout
-                  ? { padding: '10px 18px', borderRadius: 16, border: '1.5px dashed rgba(16,185,129,0.75)', background: 'rgba(16,185,129,0.08)' }
+                  ? {
+                      padding: '10px 18px',
+                      borderRadius: 16,
+                      border: selectedWidget === 'clock' ? '2px dashed #10b981' : '1.5px dashed rgba(255,255,255,0.35)',
+                      background: selectedWidget === 'clock' ? 'rgba(16,185,129,0.12)' : 'transparent',
+                    }
                   : undefined
               }
             >
@@ -452,7 +473,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Draggable Battery % Template */}
+        {/* Draggable & Scalable Battery % Template */}
         <div
           onPointerDown={(e) => startDrag('bat', e)}
           onPointerMove={onDragMove}
@@ -460,39 +481,118 @@ export default function App() {
           style={{
             width: '100%',
             height: '100%',
-            transform: `translate(${batPos.x}px, ${batPos.y}px)`,
+            transform: `translate(${batPos.x}px, ${batPos.y}px) scale(${batScale / 100})`,
             touchAction: editLayout ? 'none' : 'auto',
             cursor: editLayout ? 'grab' : 'default',
-            outline: editLayout ? '1.5px dashed rgba(255,255,255,0.35)' : 'none',
-            outlineOffset: -18,
+            outline: editLayout ? (selectedWidget === 'bat' ? '2px dashed #10b981' : '1.5px dashed rgba(255,255,255,0.3)') : 'none',
+            outlineOffset: -24,
           }}
         >
           <TemplateComponent t={telemetry} theme={theme} />
         </div>
+
+        {/* Draggable & Scalable Custom Signature / Text Widget */}
+        {showSig && (
+          <div
+            onPointerDown={(e) => startDrag('sig', e)}
+            onPointerMove={onDragMove}
+            onPointerUp={endDrag}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(var(--safe-bottom) + 92px)',
+              left: 0,
+              right: 0,
+              zIndex: 21,
+              display: 'flex',
+              justifyContent: 'center',
+              pointerEvents: editLayout ? 'auto' : 'none',
+              transform: `translate(${sigPos.x}px, ${sigPos.y}px) scale(${sigScale / 100})`,
+              touchAction: editLayout ? 'none' : 'auto',
+              cursor: editLayout ? 'grab' : 'default',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: theme.font,
+                fontSize: 13,
+                letterSpacing: '0.26em',
+                textTransform: 'uppercase',
+                color: isLight ? 'rgba(24,24,27,0.65)' : 'rgba(255,255,255,0.65)',
+                padding: editLayout ? '8px 14px' : 0,
+                borderRadius: 12,
+                border: editLayout ? (selectedWidget === 'sig' ? '2px dashed #10b981' : '1.5px dashed rgba(255,255,255,0.3)') : 'none',
+              }}
+            >
+              {sigText}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Bottom bar (template strip or Edit Layout reset bar — hidden in Lockscreen AOD) */}
       {showControls && (
         <div className="hud-bottom">
           {editLayout ? (
-            <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto' }}>
-              <button
-                className="hud-pill"
-                onClick={() => {
-                  setClockPos({ x: 0, y: 0 });
-                  setBatPos({ x: 0, y: 0 });
+            <div
+              style={{
+                pointerEvents: 'auto',
+                width: '100%',
+                maxWidth: 360,
+                padding: '12px 14px',
+                borderRadius: 20,
+                background: 'rgba(16,16,20,0.88)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.14)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                <span style={{ color: '#a1a1aa' }}>
+                  Resize <strong style={{ color: '#fff' }}>{selectedWidget === 'clock' ? 'Clock' : selectedWidget === 'sig' ? 'Text' : 'Battery %'}</strong>
+                </span>
+                <span className="tabular" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {selectedWidget === 'clock' ? clockScale : selectedWidget === 'sig' ? sigScale : batScale}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="50"
+                max="160"
+                step="5"
+                value={selectedWidget === 'clock' ? clockScale : selectedWidget === 'sig' ? sigScale : batScale}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (selectedWidget === 'clock') setClockScale(v);
+                  else if (selectedWidget === 'sig') setSigScale(v);
+                  else setBatScale(v);
                 }}
-              >
-                <RotateCcw size={13} />
-                <span>Reset Positions</span>
-              </button>
-              <button
-                className="hud-pill"
-                style={{ background: '#10b981', color: '#022c22', borderColor: '#10b981', fontWeight: 600 }}
-                onClick={() => setEditLayout(false)}
-              >
-                Done
-              </button>
+                className="range-input"
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+                <button
+                  className="hud-pill"
+                  onClick={() => {
+                    setClockPos({ x: 0, y: 0 });
+                    setBatPos({ x: 0, y: 0 });
+                    setSigPos({ x: 0, y: 0 });
+                    setClockScale(100);
+                    setBatScale(100);
+                    setSigScale(100);
+                  }}
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset All</span>
+                </button>
+                <button
+                  className="hud-pill"
+                  style={{ background: '#10b981', color: '#022c22', borderColor: '#10b981', fontWeight: 600 }}
+                  onClick={() => setEditLayout(false)}
+                >
+                  Done
+                </button>
+              </div>
             </div>
           ) : (
             <div className={`template-strip ${isLight ? 'light-surface' : ''}`}>
@@ -628,8 +728,8 @@ export default function App() {
                 </div>
 
                 <div className="sheet-section">
-                  <div className="sheet-label">Accent Color</div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div className="sheet-label">Accent Color (or pick any custom color)</div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     {ACCENT_COLORS.map((c) => (
                       <button
                         key={c.value}
@@ -646,7 +746,43 @@ export default function App() {
                         title={c.name}
                       />
                     ))}
+                    <input
+                      type="color"
+                      value={accent}
+                      onChange={(e) => setAccent(e.target.value)}
+                      style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                      title="Custom Hex Color"
+                    />
                   </div>
+                </div>
+
+                <div className="sheet-section">
+                  <div className="sheet-label">Custom Lockscreen Signature</div>
+                  <div className="toggle-row">
+                    <span style={{ fontSize: 13 }}>Show Custom Text</span>
+                    <button className={`opt-btn ${showSig ? 'active' : ''}`} style={{ padding: '6px 14px' }} onClick={() => setShowSig((v) => !v)}>
+                      {showSig ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  {showSig && (
+                    <input
+                      type="text"
+                      value={sigText}
+                      maxLength={28}
+                      onChange={(e) => setSigText(e.target.value)}
+                      placeholder="Your name or quote..."
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#fff',
+                        fontSize: 13,
+                        outline: 'none',
+                      }}
+                    />
+                  )}
                 </div>
 
                 <div className="sheet-section">
