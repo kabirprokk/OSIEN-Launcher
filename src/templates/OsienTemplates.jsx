@@ -39,7 +39,7 @@ export function KineticPure({ t, theme }) {
   const accent = theme.accent;
   const glow = theme.glow > 0 ? `0 0 ${Math.round(theme.glow * 0.45)}px ${accent}66` : 'none';
   return (
-    <div style={{ width: '100%', height: '100%', background: '#000', color: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '0 28px', gap: 22 }}>
+    <div style={{ width: '100%', height: '100%', background: 'transparent', color: '#fafafa', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '0 28px', gap: 22 }}>
       <div style={{ fontSize: 11, letterSpacing: '0.22em', color: t.chargeState === 'paused' ? '#f59e0b' : 'rgba(255,255,255,0.42)' }}>
         {statusText(t)}
       </div>
@@ -65,7 +65,7 @@ export function RadialHalo({ t, theme }) {
   const accent = theme.accent;
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 26 }}>
+    <div style={{ width: '100%', height: '100%', background: 'transparent', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 26 }}>
       <div style={{ position: 'relative', width: 268, height: 268, display: 'grid', placeItems: 'center' }}>
         <svg width="268" height="268" style={{ transform: 'rotate(-90deg)' }}>
           <circle cx="134" cy="134" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
@@ -115,7 +115,7 @@ export function PulseCore({ t, theme }) {
   const accent = theme.accent;
   const active = t.chargeState === 'charging';
   return (
-    <div style={{ width: '100%', height: '100%', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 28, overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 28, overflow: 'hidden' }}>
       <div style={{ position: 'relative', width: 240, height: 240, display: 'grid', placeItems: 'center' }}>
         {active && (
           <>
@@ -181,7 +181,7 @@ export function Monolith({ t, theme }) {
 export function OledWhisper({ t, theme }) {
   const { whole, dec } = splitPct(t.pct);
   return (
-    <div style={{ width: '100%', height: '100%', background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+    <div style={{ width: '100%', height: '100%', background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
       <div className="tabular" style={{ fontFamily: theme.font, fontWeight: 200, fontSize: 'clamp(76px, 24vw, 126px)', letterSpacing: '-0.05em', color: '#e4e4e7' }}>
         {whole}<span style={{ fontSize: '0.46em', color: theme.accent, opacity: 0.85 }}>.{dec}</span>
       </div>

@@ -130,9 +130,9 @@ export function useBatteryTelemetry({
     };
   }, [mode]);
 
-  // 250ms (4Hz) exact coulomb-counting & EWMA-smoothed telemetry loop
+  // 100ms (10Hz) exact coulomb-counting & EWMA-smoothed telemetry loop for fast 3-decimal (54.347%) updates
   useEffect(() => {
-    const TICK_MS = 250;
+    const TICK_MS = 100;
     const DT_SEC = TICK_MS / 1000;
 
     const timer = setInterval(() => {
@@ -357,7 +357,7 @@ export function formatEta(seconds, pct = 0, chargeState = 'charging') {
 
 export function splitPct(pct) {
   const clamped = Math.max(0, Math.min(100, pct));
-  const fixed = clamped.toFixed(2);
+  const fixed = clamped.toFixed(3);
   const [whole, dec] = fixed.split('.');
   return { whole, dec, full: fixed };
 }

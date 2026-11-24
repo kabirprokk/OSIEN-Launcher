@@ -34,10 +34,12 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private Sensor proximitySensor;
     private boolean isInPocket = false;
     private float userBrightness = -1f; // -1 = system default
+    private boolean launchedFromAod = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        launchedFromAod = getIntent() != null && getIntent().getBooleanExtra("from_aod", false);
 
         // True Always-On Display (AOD) over Lockscreen
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -72,6 +74,20 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 startService(svc);
             }
         } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        launchedFromAod = intent != null && intent.getBooleanExtra("from_aod", false);
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            final boolean isAod = launchedFromAod;
+            runOnUiThread(() -> this.bridge.getWebView().evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('osien-aod-mode', { detail: " + isAod + " }));",
+                null
+            ));
+        }
     }
 
     @Override
@@ -142,6 +158,11 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     }
 
     public class AndroidBatteryBridge {
+        @JavascriptInterface
+        public boolean isAodLaunch() {
+            return launchedFromAod;
+        }
+
         @JavascriptInterface
         public boolean hasAodPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
