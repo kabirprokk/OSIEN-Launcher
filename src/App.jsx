@@ -1,11 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SlidersHorizontal, EyeOff, Eye, Palette } from 'lucide-react';
+import { SlidersHorizontal, EyeOff, Eye, Palette, Download } from 'lucide-react';
 import {
   CHARGER_PRESETS,
   CAPACITY_PRESETS,
   useBatteryTelemetry,
 } from './engine/batteryEngine';
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
+
+const APP_VERSION = '0.0.2';
+const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
+
+function isNewerVersion(latestTag, current) {
+  const a = latestTag.replace(/^v/i, '').split('.').map(Number);
+  const b = current.replace(/^v/i, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] || 0) - (b[i] || 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
 
 export default function App() {
   const [tplIndex, setTplIndex] = useState(() => {
@@ -33,6 +46,38 @@ export default function App() {
   const [showClock, setShowClock] = useState(() => localStorage.getItem('ov_clock') !== 'false');
   const [now, setNow] = useState(() => new Date());
   const [burnInOffset, setBurnInOffset] = useState({ x: 0, y: 0 });
+  const [updateInfo, setUpdateInfo] = useState(null); // { version, apkUrl }
+  const [updating, setUpdating] = useState(false);
+
+  // Check GitHub Releases for newer version on app start
+  useEffect(() => {
+    let active = true;
+    fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!active || !data || !data.tag_name) return;
+        if (isNewerVersion(data.tag_name, APP_VERSION)) {
+          const apkAsset = (data.assets || []).find((a) => a.name && a.name.endsWith('.apk'));
+          setUpdateInfo({
+            version: data.tag_name,
+            apkUrl: apkAsset ? apkAsset.browser_download_url : data.html_url,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const triggerUpdate = () => {
+    if (!updateInfo || updating) return;
+    setUpdating(true);
+    if (typeof window !== 'undefined' && window.AndroidBattery && window.AndroidBattery.downloadAndInstallUpdate) {
+      window.AndroidBattery.downloadAndInstallUpdate(updateInfo.apkUrl);
+    } else {
+      window.open(updateInfo.apkUrl, '_blank');
+      setUpdating(false);
+    }
+  };
 
   const lastTapRef = useRef(0);
   const touchStartX = useRef(null);
@@ -142,6 +187,52 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* Automatic OTA Update Banner */}
+      {updateInfo && hudVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'calc(var(--safe-top) + 52px)',
+            left: 16,
+            right: 16,
+            zIndex: 45,
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="hud-pill"
+            style={{
+              pointerEvents: 'auto',
+              background: 'rgba(16, 185, 129, 0.18)',
+              borderColor: 'rgba(16, 185, 129, 0.45)',
+              color: '#ecfdf5',
+              padding: '7px 14px',
+              gap: 10,
+            }}
+          >
+            <Download size={13} color="#34d399" />
+            <span>Update {updateInfo.version} available</span>
+            <button
+              onClick={triggerUpdate}
+              style={{
+                background: '#10b981',
+                color: '#022c22',
+                border: 'none',
+                borderRadius: 99,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {updating ? 'Downloading...' : 'Update'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main full-bleed stage */}
       <div

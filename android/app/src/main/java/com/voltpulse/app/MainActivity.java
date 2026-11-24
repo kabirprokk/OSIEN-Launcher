@@ -1,6 +1,9 @@
 package com.voltpulse.app;
 
+import android.app.DownloadManager;
 import android.app.KeyguardManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -12,6 +15,7 @@ import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.View;
@@ -19,7 +23,9 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import androidx.core.content.FileProvider;
 import com.getcapacitor.BridgeActivity;
+import java.io.File;
 import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity implements SensorEventListener {
@@ -196,6 +202,66 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                     moveTaskToBack(true);
                 }
             });
+        }
+
+        @JavascriptInterface
+        public void downloadAndInstallUpdate(String apkUrl) {
+            runOnUiThread(() -> {
+                try {
+                    File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                    File apkFile = new File(dir, "OSIEN-Volt-update.apk");
+                    if (apkFile.exists()) apkFile.delete();
+
+                    DownloadManager.Request req = new DownloadManager.Request(Uri.parse(apkUrl));
+                    req.setTitle("OSIEN Volt Update");
+                    req.setDescription("Downloading latest release...");
+                    req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
+                    req.setDestinationUri(Uri.fromFile(apkFile));
+
+                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    if (dm == null) return;
+                    long downloadId = dm.enqueue(req);
+
+                    BroadcastReceiver onComplete = new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context ctx, Intent intent) {
+                            long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                            if (id == downloadId) {
+                                try {
+                                    unregisterReceiver(this);
+                                } catch (Exception ignored) {}
+                                installApkFile(apkFile);
+                            }
+                        }
+                    };
+
+                    IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        registerReceiver(onComplete, filter, Context.RECEIVER_EXPORTED);
+                    } else {
+                        registerReceiver(onComplete, filter);
+                    }
+                } catch (Exception e) {
+                    // Fallback: open download URL in browser
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)));
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+
+        private void installApkFile(File apkFile) {
+            try {
+                Uri contentUri = FileProvider.getUriForFile(
+                    MainActivity.this,
+                    getPackageName() + ".fileprovider",
+                    apkFile
+                );
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                install.setDataAndType(contentUri, "application/vnd.android.package-archive");
+                install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(install);
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
