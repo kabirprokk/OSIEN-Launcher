@@ -1,14 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SlidersHorizontal, Palette, Download, Move, RotateCcw, Image as ImageIcon } from 'lucide-react';
 import {
-  CHARGER_PRESETS,
   CAPACITY_PRESETS,
   useBatteryTelemetry,
 } from './engine/batteryEngine';
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.6';
+const APP_VERSION = '0.0.7';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -84,12 +83,8 @@ export default function App() {
   const [selectedWidget, setSelectedWidget] = useState('bat'); // 'clock' | 'bat' | 'sig'
   const dragRef = useRef(null);
 
-  // AOD & Calibration state
-  const [mode, setMode] = useState('auto');
-  const [chargerId, setChargerId] = useState(() => localStorage.getItem('ov_charger') || 'turbo-67w');
+  // AOD & Calibration state (real hardware only)
   const [capacityMah, setCapacityMah] = useState(() => Number(localStorage.getItem('ov_cap') || 5000));
-  const [simCharging, setSimCharging] = useState(true);
-  const [smartLimitPct, setSmartLimitPct] = useState(0);
   const [aodEnabled, setAodEnabled] = useState(() => localStorage.getItem('ov_aod_on') !== 'false');
   const [aodChargingOnly, setAodChargingOnly] = useState(() => localStorage.getItem('ov_aod_chg') === 'true');
   const [aodBrightness, setAodBrightness] = useState(() => Number(localStorage.getItem('ov_bright') || 35));
@@ -200,7 +195,6 @@ export default function App() {
     localStorage.setItem('ov_sc_sig', String(sigScale));
     localStorage.setItem('ov_sig_text', sigText);
     localStorage.setItem('ov_sig_show', String(showSig));
-    localStorage.setItem('ov_charger', chargerId);
     localStorage.setItem('ov_cap', String(capacityMah));
     localStorage.setItem('ov_aod_on', String(aodEnabled));
     localStorage.setItem('ov_aod_chg', String(aodChargingOnly));
@@ -220,7 +214,7 @@ export default function App() {
         // Ignore
       }
     }
-  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, chargerId, capacityMah, aodEnabled, aodChargingOnly, aodBrightness, popupEnabled, popupStyle, popupDelayMs]);
+  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, capacityMah, aodEnabled, aodChargingOnly, aodBrightness, popupEnabled, popupStyle, popupDelayMs]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -237,13 +231,9 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const { telemetry, setManualPct } = useBatteryTelemetry({
-    mode,
-    chargerId,
+  const { telemetry } = useBatteryTelemetry({
+    mode: 'auto',
     capacityMah,
-    simCharging,
-    simStartPct: 54.347,
-    smartLimitPct,
   });
 
   const activeTemplate = TEMPLATES[tplIndex];
@@ -907,46 +897,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="sheet-section">
-                  <div className="sheet-label">Sensor / Test Mode</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                    <button className={`opt-btn ${mode === 'auto' ? 'active' : ''}`} onClick={() => setMode('auto')}>
-                      Auto Hardware
-                    </button>
-                    <button className={`opt-btn ${mode === 'simulate' ? 'active' : ''}`} onClick={() => setMode('simulate')}>
-                      Test Sim
-                    </button>
-                  </div>
-                  {telemetry.source === 'simulated' && (
-                    <>
-                      <div className="chip-grid" style={{ marginBottom: 8 }}>
-                        {CHARGER_PRESETS.map((c) => (
-                          <button key={c.id} className={`opt-btn ${chargerId === c.id ? 'active' : ''}`} onClick={() => setChargerId(c.id)}>
-                            {c.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="toggle-row">
-                        <span style={{ fontSize: 12 }}>Test Smart Charge Pause</span>
-                        <button
-                          className={`opt-btn ${smartLimitPct > 0 ? 'active' : ''}`}
-                          style={{ padding: '5px 12px' }}
-                          onClick={() => setSmartLimitPct((v) => (v === 0 ? 85 : 0))}
-                        >
-                          {smartLimitPct > 0 ? `Stop @ ${smartLimitPct}%` : 'Off'}
-                        </button>
-                      </div>
-                      <div className="toggle-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                          <span>Test Level</span>
-                          <span className="tabular" style={{ fontFamily: 'var(--font-mono)' }}>{telemetry.pct.toFixed(3)}%</span>
-                        </div>
-                        <input type="range" min="1" max="99" value={Math.round(telemetry.pct)} onChange={(e) => setManualPct(Number(e.target.value) + 0.347)} className="range-input" />
-                      </div>
-                    </>
-                  )}
                 </div>
               </>
             )}
