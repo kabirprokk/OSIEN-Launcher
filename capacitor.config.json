@@ -1,6 +1,6 @@
 {
   "appId": "com.voltpulse.app",
-  "appName": "OSIEN Volt",
+  "appName": "OSIEN Launcher",
   "webDir": "dist",
   "android": {
     "backgroundColor": "#000000"

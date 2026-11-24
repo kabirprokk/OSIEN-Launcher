@@ -8,7 +8,15 @@ import {
 import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 
-const APP_VERSION = '0.0.5';
+const APP_VERSION = '0.0.6';
+const POPUP_STYLES = [
+  { id: 'island', label: 'Dynamic Island' },
+  { id: 'edge', label: 'Edge Glow' },
+  { id: 'glass', label: 'Glass Card' },
+  { id: 'nothing', label: 'Nothing Dot' },
+  { id: 'dock', label: 'Bottom Dock' },
+  { id: 'float', label: 'Pure Float' },
+];
 const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
 
 function isNewerVersion(latestTag, current) {
@@ -85,6 +93,9 @@ export default function App() {
   const [aodEnabled, setAodEnabled] = useState(() => localStorage.getItem('ov_aod_on') !== 'false');
   const [aodChargingOnly, setAodChargingOnly] = useState(() => localStorage.getItem('ov_aod_chg') === 'true');
   const [aodBrightness, setAodBrightness] = useState(() => Number(localStorage.getItem('ov_bright') || 35));
+  const [popupEnabled, setPopupEnabled] = useState(() => localStorage.getItem('ov_pop_on') !== 'false');
+  const [popupStyle, setPopupStyle] = useState(() => localStorage.getItem('ov_pop_style') || 'island');
+  const [popupDelayMs, setPopupDelayMs] = useState(() => Number(localStorage.getItem('ov_pop_delay') ?? 2800));
   const [now, setNow] = useState(() => new Date());
   const [burnInOffset, setBurnInOffset] = useState({ x: 0, y: 0 });
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -194,16 +205,22 @@ export default function App() {
     localStorage.setItem('ov_aod_on', String(aodEnabled));
     localStorage.setItem('ov_aod_chg', String(aodChargingOnly));
     localStorage.setItem('ov_bright', String(aodBrightness));
+    localStorage.setItem('ov_pop_on', String(popupEnabled));
+    localStorage.setItem('ov_pop_style', popupStyle);
+    localStorage.setItem('ov_pop_delay', String(popupDelayMs));
 
     if (typeof window !== 'undefined' && window.AndroidBattery) {
       try {
         window.AndroidBattery.setAodConfig(aodEnabled, aodChargingOnly);
         window.AndroidBattery.setAodBrightness(Math.max(0.03, aodBrightness / 100));
+        if (window.AndroidBattery.setPopupConfig) {
+          window.AndroidBattery.setPopupConfig(popupEnabled, popupStyle, popupDelayMs, accent);
+        }
       } catch {
         // Ignore
       }
     }
-  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, chargerId, capacityMah, aodEnabled, aodChargingOnly, aodBrightness]);
+  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, chargerId, capacityMah, aodEnabled, aodChargingOnly, aodBrightness, popupEnabled, popupStyle, popupDelayMs]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -339,7 +356,7 @@ export default function App() {
         <div className="hud-top">
           <button className={`hud-pill ${isLight ? 'light-surface' : ''}`} onClick={() => setSheetTab('aod')}>
             <span className={`hud-dot ${telemetry.source === 'simulated' ? 'sim' : ''}`} />
-            <span style={{ fontWeight: 600 }}>OSIEN Volt</span>
+            <span style={{ fontWeight: 600 }}>OSIEN Launcher</span>
             <span style={{ opacity: 0.45 }}>·</span>
             <span>{editLayout ? 'Drag Widgets' : activeTemplate.name}</span>
           </button>
@@ -613,7 +630,7 @@ export default function App() {
       {needsSetup && (
         <div className="sheet-backdrop" style={{ alignItems: 'center', padding: 20 }}>
           <div className="sheet-panel" style={{ borderRadius: 24, padding: 24, maxWidth: 380 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Quick Setup · OSIEN Volt</div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Quick Setup · OSIEN Launcher</div>
             <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 18, lineHeight: 1.5 }}>
               Enable these 2 Android permissions so OSIEN Volt can show automatically over your lockscreen when your screen turns off.
             </div>
@@ -814,6 +831,39 @@ export default function App() {
               </>
             ) : (
               <>
+                <div className="sheet-section">
+                  <div className="sheet-label">Charger Connected Pop-Up (All Phones)</div>
+                  <div className="toggle-row">
+                    <span style={{ fontSize: 13 }}>Minimal On-Screen Pop-Up</span>
+                    <button className={`opt-btn ${popupEnabled ? 'active' : ''}`} style={{ padding: '6px 14px' }} onClick={() => setPopupEnabled((v) => !v)}>
+                      {popupEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  <div className="chip-grid" style={{ marginBottom: 8 }}>
+                    {POPUP_STYLES.map((p) => (
+                      <button key={p.id} className={`opt-btn ${popupStyle === p.id ? 'active' : ''}`} onClick={() => setPopupStyle(p.id)}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="toggle-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>Delay after OEM Ring (Samsung/MIUI)</span>
+                      <span className="tabular" style={{ fontFamily: 'var(--font-mono)' }}>{(popupDelayMs / 1000).toFixed(1)}s</span>
+                    </div>
+                    <input type="range" min="0" max="5000" step="200" value={popupDelayMs} onChange={(e) => setPopupDelayMs(Number(e.target.value))} className="range-input" />
+                  </div>
+                  {typeof window !== 'undefined' && window.AndroidBattery && window.AndroidBattery.testChargingPopup && (
+                    <button
+                      className="opt-btn active"
+                      style={{ width: '100%', padding: '10px', marginTop: 4 }}
+                      onClick={() => window.AndroidBattery.testChargingPopup()}
+                    >
+                      Test Charging Pop-Up Now
+                    </button>
+                  )}
+                </div>
+
                 <div className="sheet-section">
                   <div className="sheet-label">Always-On Display (v{APP_VERSION})</div>
                   <div className="toggle-row">

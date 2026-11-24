@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">OSIEN Volt</string>
-    <string name="title_activity_main">OSIEN Volt</string>
+    <string name="app_name">OSIEN Launcher</string>
+    <string name="title_activity_main">OSIEN Launcher</string>
     <string name="package_name">com.voltpulse.app</string>
     <string name="custom_url_scheme">com.voltpulse.app</string>
 </resources>

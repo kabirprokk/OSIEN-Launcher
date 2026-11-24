@@ -35,6 +35,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private boolean isInPocket = false;
     private float userBrightness = -1f; // -1 = system default
     private boolean launchedFromAod = false;
+    private BroadcastReceiver unlockReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +66,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             this.bridge.getWebView().addJavascriptInterface(new AndroidBatteryBridge(), "AndroidBattery");
         }
 
-        // Start background foreground service so AOD stays alive when app is closed
+        // Start background foreground service so AOD & Charging Pop-Up stay alive when app is closed
         try {
             Intent svc = new Intent(this, ChargingMonitorService.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -74,6 +75,33 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 startService(svc);
             }
         } catch (Exception ignored) {}
+
+        // Auto-dismiss AOD the instant the user unlocks their phone (no double-tap needed!)
+        unlockReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_USER_PRESENT.equals(intent.getAction()) && launchedFromAod) {
+                    launchedFromAod = false;
+                    moveTaskToBack(true);
+                }
+            }
+        };
+        IntentFilter unlockFilter = new IntentFilter(Intent.ACTION_USER_PRESENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(unlockReceiver, unlockFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(unlockReceiver, unlockFilter);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (unlockReceiver != null) {
+            try {
+                unregisterReceiver(unlockReceiver);
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override
@@ -261,6 +289,32 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 .putBoolean("aod_enabled", enabled)
                 .putBoolean("aod_charging_only", chargingOnly)
                 .apply();
+        }
+
+        @JavascriptInterface
+        public void setPopupConfig(boolean enabled, String style, int delayMs, String accentHex) {
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit()
+                .putBoolean("popup_enabled", enabled)
+                .putString("popup_style", style)
+                .putInt("popup_delay_ms", delayMs)
+                .putString("popup_accent", accentHex)
+                .apply();
+        }
+
+        @JavascriptInterface
+        public void testChargingPopup() {
+            runOnUiThread(() -> {
+                try {
+                    Intent svc = new Intent(MainActivity.this, ChargingMonitorService.class);
+                    svc.setAction(ChargingMonitorService.ACTION_TEST_POPUP);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(svc);
+                    } else {
+                        startService(svc);
+                    }
+                } catch (Exception ignored) {}
+            });
         }
 
         @JavascriptInterface
