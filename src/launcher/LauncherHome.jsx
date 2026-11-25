@@ -7,6 +7,7 @@ import {
   Shield, Sparkles, Play, Folder, Compass, Terminal, AppWindow,
 } from 'lucide-react';
 import { useBatteryTelemetry, splitPct } from '../engine/batteryEngine';
+import { MonochromeAppIcon } from './BrandIcons';
 import './launcher.css';
 
 const DEFAULT_GESTURE = ['UP', 'TAP', 'RIGHT', 'LEFT', 'DOWN'];
@@ -54,36 +55,10 @@ function loadInstalledApps() {
   return FALLBACK_APPS;
 }
 
-const iconMemCache = new Map();
 function AppDiamondIcon({ app }) {
-  const key = `${app.packageName}:${app.className || ''}`;
-  const [src, setSrc] = useState(() => app.icon || iconMemCache.get(key) || '');
-
-  useEffect(() => {
-    if (src) return;
-    let active = true;
-    const id = requestAnimationFrame(() => {
-      try {
-        const bridge = window.AndroidBattery;
-        if (bridge && typeof bridge.getAppIcon === 'function') {
-          const uri = bridge.getAppIcon(app.packageName, app.className || '');
-          if (uri && active) {
-            iconMemCache.set(key, uri);
-            setSrc(uri);
-          }
-        }
-      } catch { /* ignore */ }
-    });
-    return () => { active = false; cancelAnimationFrame(id); };
-  }, [app.packageName, app.className, key, src]);
-
-  if (src) {
-    return <img src={src} alt={app.label} className="osien-diamond-img" loading="lazy" decoding="async" />;
-  }
-  const IconComp = getAppLucideIcon(app);
   return (
     <span className="osien-diamond-glyph" style={{ display: 'grid', placeItems: 'center' }}>
-      <IconComp size={15} strokeWidth={1.9} />
+      <MonochromeAppIcon app={app} />
     </span>
   );
 }
