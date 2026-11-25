@@ -8,7 +8,7 @@ import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 import LauncherHome from './launcher/LauncherHome';
 
-const APP_VERSION = '0.0.9';
+const APP_VERSION = '0.0.10';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -17,7 +17,7 @@ const POPUP_STYLES = [
   { id: 'dock', label: 'Bottom Dock' },
   { id: 'float', label: 'Pure Float' },
 ];
-const RELEASES_API = 'https://api.github.com/repos/kabirprokk/OSIEN-Launcher/releases/latest';
+const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
 
 function isNewerVersion(latestTag, current) {
   const a = latestTag.replace(/^v/i, '').split('.').map(Number);
