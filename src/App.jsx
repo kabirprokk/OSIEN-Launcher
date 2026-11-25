@@ -8,7 +8,7 @@ import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 import LauncherHome from './launcher/LauncherHome';
 
-const APP_VERSION = '0.0.11';
+const APP_VERSION = '0.0.12';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -17,7 +17,7 @@ const POPUP_STYLES = [
   { id: 'dock', label: 'Bottom Dock' },
   { id: 'float', label: 'Pure Float' },
 ];
-const RELEASES_API = 'https://api.github.com/repos/kabirprokk/osien-volt/releases/latest';
+const RELEASES_API = 'https://api.github.com/repos/kabirprokk/OSIEN-Launcher/releases/latest';
 
 function isNewerVersion(latestTag, current) {
   const a = latestTag.replace(/^v/i, '').split('.').map(Number);
@@ -931,6 +931,8 @@ export default function App() {
     const battery = new URLSearchParams(window.location.search).get('view') === 'battery';
     return aod || battery ? 'battery' : 'home';
   });
+  const [homeUpdate, setHomeUpdate] = useState(null);
+  const [homeUpdating, setHomeUpdating] = useState(false);
 
   useEffect(() => {
     const onLaunchMode = (event) => setView(event.detail?.aod ? 'battery' : 'home');
@@ -943,7 +945,83 @@ export default function App() {
     };
   }, []);
 
-  return view === 'battery'
-    ? <BatteryApp onExitHome={() => setView('home')} />
-    : <LauncherHome />;
+  // Global OTA update check so the banner appears right on the Home Screen too
+  useEffect(() => {
+    let active = true;
+    fetch(RELEASES_API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!active || !data || !data.tag_name) return;
+        if (isNewerVersion(data.tag_name, APP_VERSION)) {
+          const apkAsset = (data.assets || []).find((a) => a.name && a.name.endsWith('.apk'));
+          setHomeUpdate({
+            version: data.tag_name,
+            apkUrl: apkAsset ? apkAsset.browser_download_url : data.html_url,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const triggerHomeUpdate = () => {
+    if (!homeUpdate || homeUpdating) return;
+    setHomeUpdating(true);
+    if (typeof window !== 'undefined' && window.AndroidBattery?.downloadAndInstallUpdate) {
+      window.AndroidBattery.downloadAndInstallUpdate(homeUpdate.apkUrl);
+    } else {
+      window.open(homeUpdate.apkUrl, '_blank');
+      setHomeUpdating(false);
+    }
+  };
+
+  return (
+    <>
+      {view === 'battery' ? <BatteryApp onExitHome={() => setView('home')} /> : <LauncherHome />}
+      {view === 'home' && homeUpdate && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'calc(var(--safe-top) + 56px)',
+            left: 16,
+            right: 16,
+            zIndex: 80,
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            className="hud-pill"
+            style={{
+              pointerEvents: 'auto',
+              background: 'rgba(16, 185, 129, 0.22)',
+              borderColor: 'rgba(16, 185, 129, 0.55)',
+              color: '#ecfdf5',
+              padding: '7px 14px',
+              gap: 10,
+            }}
+          >
+            <Download size={13} color="#34d399" />
+            <span>Update {homeUpdate.version} available</span>
+            <button
+              onClick={triggerHomeUpdate}
+              style={{
+                background: '#10b981',
+                color: '#022c22',
+                border: 'none',
+                borderRadius: 99,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {homeUpdating ? 'Downloading...' : 'Update'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
