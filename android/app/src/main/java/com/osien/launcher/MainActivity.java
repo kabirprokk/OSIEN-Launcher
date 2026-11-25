@@ -45,6 +45,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private float userBrightness = -1f; // -1 = system default
     private boolean launchedFromAod = false;
     private boolean torchOn = false;
+    private boolean gestureLockActive = false;
     private boolean launchedAsHome = false;
     private volatile boolean backHandlingEnabled = false;
     private final java.util.Map<String, String> appIconCache = new ConcurrentHashMap<>();
@@ -172,6 +173,15 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         } else {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        if (gestureLockActive) {
+            return; // Block Back button while OSIEN Invisible Gesture Lock is active
+        }
+        super.onBackPressed();
     }
 
     @Override
@@ -390,6 +400,34 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                     am.setStreamVolume(android.media.AudioManager.STREAM_RING, target, 0);
                 }
             } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public boolean isGestureLockArmed() {
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            boolean armed = prefs.getBoolean("gesture_lock_armed", false);
+            if (armed) gestureLockActive = true;
+            return armed;
+        }
+
+        @JavascriptInterface
+        public void setGestureLockEnabled(boolean enabled) {
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putBoolean("gesture_lock_enabled", enabled).apply();
+        }
+
+        @JavascriptInterface
+        public void armGestureLockNow() {
+            gestureLockActive = true;
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putBoolean("gesture_lock_armed", true).apply();
+        }
+
+        @JavascriptInterface
+        public void clearGestureLock() {
+            gestureLockActive = false;
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putBoolean("gesture_lock_armed", false).apply();
         }
 
         @JavascriptInterface

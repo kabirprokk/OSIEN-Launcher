@@ -95,10 +95,48 @@ export default function LauncherHome() {
   const [apps, setApps] = useState(() => loadInstalledApps());
   const [now, setNow] = useState(() => new Date());
 
-  // Screen 1: Invisible Gesture Lock (↑ • → ← ↓)
-  const [locked, setLocked] = useState(false);
+  // Screen 1: Real Invisible Gesture Lock (auto-arms on screen off + custom secret sequence)
+  const [secretGesture, setSecretGesture] = useState(() => readJson('osien_secret_gesture', DEFAULT_GESTURE));
+  const [autoLockOn, setAutoLockOn] = useState(() => localStorage.getItem('osien_autolock') === 'true');
+  const [locked, setLocked] = useState(() => {
+    try { return Boolean(window.AndroidBattery?.isGestureLockArmed?.()); } catch { return false; }
+  });
   const [gestureBuffer, setGestureBuffer] = useState([]);
+  const [recordingGesture, setRecordingGesture] = useState(false);
+  const [recordedSteps, setRecordedSteps] = useState([]);
   const lockTouchRef = useRef(null);
+
+  // Re-check native armed lock state whenever phone wakes / returns to launcher
+  useEffect(() => {
+    const checkArmed = () => {
+      try {
+        if (window.AndroidBattery?.isGestureLockArmed?.()) {
+          setLocked(true);
+          setPanel(null);
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('focus', checkArmed);
+    document.addEventListener('visibilitychange', checkArmed);
+    return () => {
+      window.removeEventListener('focus', checkArmed);
+      document.removeEventListener('visibilitychange', checkArmed);
+    };
+  }, []);
+
+  const toggleAutoLock = () => {
+    const next = !autoLockOn;
+    setAutoLockOn(next);
+    localStorage.setItem('osien_autolock', String(next));
+    try { window.AndroidBattery?.setGestureLockEnabled?.(next); } catch { /* ignore */ }
+  };
+
+  const lockPhoneNow = () => {
+    setGestureBuffer([]);
+    setPanel(null);
+    setLocked(true);
+    try { window.AndroidBattery?.armGestureLockNow?.(); } catch { /* ignore */ }
+  };
 
   // Panels: null | 'control' (Screen 4) | 'matrix' (Screen 5) | 'drawer' (Screen 7) | 'wallpaper'
   const [panel, setPanel] = useState(null);
@@ -331,9 +369,10 @@ export default function LauncherHome() {
     }
 
     setGestureBuffer((prev) => {
-      const next = [...prev, step].slice(-DEFAULT_GESTURE.length);
-      if (next.length === DEFAULT_GESTURE.length && next.every((v, i) => v === DEFAULT_GESTURE[i])) {
+      const next = [...prev, step].slice(-secretGesture.length);
+      if (next.length === secretGesture.length && next.every((v, i) => v === secretGesture[i])) {
         setLocked(false);
+        try { window.AndroidBattery?.clearGestureLock?.(); } catch { /* ignore */ }
         return [];
       }
       return next;
@@ -440,7 +479,7 @@ export default function LauncherHome() {
               </div>
             </div>
 
-            <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => { setGestureBuffer([]); setLocked(true); }}>
+            <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={lockPhoneNow}>
               <Lock size={20} color="#38bdf8" />
               <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'rgba(248,250,252,0.65)' }}>GESTURE LOCK</span>
             </div>
@@ -629,7 +668,7 @@ export default function LauncherHome() {
                 <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={16} /></button>
                 <button className="osien-circle-btn" onClick={() => { setPanel(null); window.dispatchEvent(new CustomEvent('osien-open-battery')); }} title="AOD Studio"><BatteryCharging size={16} /></button>
                 <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => { setPanel(null); setGestureBuffer([]); setLocked(true); }} title="Gesture Lock"><Lock size={16} /></button>
+                <button className={`osien-circle-btn ${autoLockOn ? 'active' : ''}`} onClick={() => setPanel('locksetup')} title="Gesture Lock Settings"><Lock size={16} /></button>
                 <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Internet"><Wifi size={16} /></button>
               </div>
 
@@ -641,6 +680,86 @@ export default function LauncherHome() {
                 <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Ringtone"><Bell size={16} /></button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* GESTURE LOCK SETUP & CUSTOM RECORDER */}
+      {panel === 'locksetup' && (
+        <div className="osien-bottom-card-backdrop" onClick={() => { setPanel(null); setRecordingGesture(false); }}>
+          <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>OSIEN Gesture Lock</span>
+              <button className="osien-circle-btn" style={{ width: 30, height: 30 }} onClick={() => { setPanel(null); setRecordingGesture(false); }}><X size={14} /></button>
+            </div>
+
+            <div className="toggle-row">
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Auto-Lock on Screen Off</div>
+                <div style={{ fontSize: 11, color: '#71717a' }}>Shows blank lock screen when phone wakes</div>
+              </div>
+              <button className={`opt-btn ${autoLockOn ? 'active' : ''}`} style={{ padding: '6px 14px' }} onClick={toggleAutoLock}>
+                {autoLockOn ? 'On' : 'Off'}
+              </button>
+            </div>
+
+            <div style={{ padding: '12px', borderRadius: 16, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', marginBottom: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.14em', color: '#94a3b8', marginBottom: 6 }}>
+                {recordingGesture ? 'SWIPE OR TAP BELOW (3–6 STEPS)' : 'CURRENT SECRET GESTURE'}
+              </div>
+              <div style={{ fontSize: 22, letterSpacing: '0.22em', fontFamily: 'var(--font-mono)', color: '#38bdf8' }}>
+                {(recordingGesture ? recordedSteps : secretGesture).map((s) =>
+                  s === 'UP' ? '↑' : s === 'DOWN' ? '↓' : s === 'LEFT' ? '←' : s === 'RIGHT' ? '→' : '•'
+                ).join(' ') || '—'}
+              </div>
+            </div>
+
+            {recordingGesture ? (
+              <>
+                <div
+                  style={{ height: 110, borderRadius: 18, border: '1.5px dashed #38bdf8', background: 'rgba(56,189,248,0.08)', display: 'grid', placeItems: 'center', fontSize: 12, color: '#94a3b8', touchAction: 'none', marginBottom: 10 }}
+                  onTouchStart={(e) => { lockTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+                  onTouchEnd={(e) => {
+                    if (!lockTouchRef.current) return;
+                    const dx = e.changedTouches[0].clientX - lockTouchRef.current.x;
+                    const dy = e.changedTouches[0].clientY - lockTouchRef.current.y;
+                    lockTouchRef.current = null;
+                    let step = 'TAP';
+                    if (Math.abs(dx) > 32 || Math.abs(dy) > 32) {
+                      step = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'RIGHT' : 'LEFT') : (dy > 0 ? 'DOWN' : 'UP');
+                    }
+                    setRecordedSteps((prev) => prev.length < 6 ? [...prev, step] : prev);
+                  }}
+                >
+                  Swipe or Tap here to record
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button className="opt-btn" style={{ padding: 10 }} onClick={() => setRecordedSteps([])}>Clear</button>
+                  <button
+                    className="opt-btn active"
+                    style={{ padding: 10 }}
+                    onClick={() => {
+                      if (recordedSteps.length >= 3) {
+                        setSecretGesture(recordedSteps);
+                        localStorage.setItem('osien_secret_gesture', JSON.stringify(recordedSteps));
+                        setRecordingGesture(false);
+                      }
+                    }}
+                  >
+                    Save ({recordedSteps.length})
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button className="opt-btn" style={{ padding: 11 }} onClick={() => { setRecordedSteps([]); setRecordingGesture(true); }}>
+                  Record Custom
+                </button>
+                <button className="opt-btn active" style={{ padding: 11 }} onClick={lockPhoneNow}>
+                  Lock Now
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

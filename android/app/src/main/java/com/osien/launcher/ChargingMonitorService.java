@@ -66,6 +66,10 @@ public class ChargingMonitorService extends Service {
                         wakeAndLaunchAod(context);
                     }
                 } else if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                    boolean gestureLock = prefs.getBoolean("gesture_lock_enabled", false);
+                    if (gestureLock) {
+                        prefs.edit().putBoolean("gesture_lock_armed", true).apply();
+                    }
                     if (aodEnabled && (!chargingOnly || isDeviceCharging(context))) {
                         mainHandler.postDelayed(() -> wakeAndLaunchAod(context), 320);
                     }
