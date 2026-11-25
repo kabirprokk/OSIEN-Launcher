@@ -278,17 +278,15 @@ export default function LauncherHome() {
   const mm = String(now.getMinutes()).padStart(2, '0');
   const dateStr = now.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 
-  const renderIcon = (app) => (
-    <div className="osien-icon-box">
-      {app.icon ? (
-        <img src={app.icon} alt={app.label} loading="lazy" />
-      ) : (
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#38bdf8' }}>
-          {(app.label || '?').slice(0, 1).toUpperCase()}
-        </span>
-      )}
-    </div>
-  );
+  const renderIcon = (app) => {
+    const clean = (app.label || '?').trim();
+    const monogram = clean.slice(0, 1).toUpperCase();
+    return (
+      <div className="osien-icon-box">
+        <span className="osien-diamond-glyph">{monogram}</span>
+      </div>
+    );
+  };
 
   return (
     <div
