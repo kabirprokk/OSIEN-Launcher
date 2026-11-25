@@ -72,10 +72,21 @@ export default function LauncherHome() {
   const [query, setQuery] = useState('');
   const [contextApp, setContextApp] = useState(null);
 
-  // Controls state (Screen 4)
-  const [brightness, setBrightness] = useState(() => Number(localStorage.getItem('osien_cc_bright') || 65));
-  const [volume, setVolume] = useState(55);
-  const [toggles, setToggles] = useState({ wifi: true, bt: true, plane: false, hotspot: false, dnd: false });
+  // Controls state (Screen 4 — synced to real Android hardware)
+  const [brightness, setBrightness] = useState(() => {
+    try {
+      const b = Number(window.AndroidBattery?.getSystemBrightness?.());
+      if (Number.isFinite(b) && b >= 5) return b;
+    } catch { /* ignore */ }
+    return Number(localStorage.getItem('osien_cc_bright') || 65);
+  });
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = Number(window.AndroidBattery?.getSystemVolume?.());
+      if (Number.isFinite(v) && v >= 0) return v;
+    } catch { /* ignore */ }
+    return 55;
+  });
 
   // Pins & Wallpaper
   const [dockPins, setDockPins] = useState(() => readJson('osien_dock_pins', null));
@@ -138,7 +149,26 @@ export default function LauncherHome() {
     const clamped = Math.max(5, Math.min(100, val));
     setBrightness(clamped);
     localStorage.setItem('osien_cc_bright', String(clamped));
-    try { window.AndroidBattery?.setAodBrightness?.(clamped / 100); } catch { /* ignore */ }
+    try {
+      window.AndroidBattery?.setHomeBrightness?.(clamped / 100);
+      window.AndroidBattery?.setSystemBrightness?.(clamped);
+    } catch { /* ignore */ }
+  };
+
+  const updateVolume = (val) => {
+    const clamped = Math.max(0, Math.min(100, val));
+    setVolume(clamped);
+    try { window.AndroidBattery?.setSystemVolume?.(clamped); } catch { /* ignore */ }
+  };
+
+  const openNativePanel = (name) => {
+    try { window.AndroidBattery?.openSystemPanel?.(name); } catch { /* ignore */ }
+  };
+
+  const handleVSliderPointer = (e, setter) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(100, Math.round(((rect.bottom - e.clientY) / rect.height) * 100)));
+    setter(pct);
   };
 
   const handleWallpaperUpload = (e) => {
@@ -324,40 +354,36 @@ export default function LauncherHome() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
-              {/* Left Circular Quick Toggles */}
+              {/* Left Circular Quick Toggles -> Real Android System Panels */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                <button className={`osien-circle-btn ${toggles.wifi ? 'active' : ''}`} onClick={() => setToggles((s) => ({ ...s, wifi: !s.wifi }))}><Wifi size={17} /></button>
-                <button className={`osien-circle-btn ${toggles.plane ? 'active' : ''}`} onClick={() => setToggles((s) => ({ ...s, plane: !s.plane }))}><Plane size={17} /></button>
-                <button className={`osien-circle-btn ${toggles.bt ? 'active' : ''}`} onClick={() => setToggles((s) => ({ ...s, bt: !s.bt }))}><Bluetooth size={17} /></button>
-                <button className={`osien-circle-btn ${toggles.hotspot ? 'active' : ''}`} onClick={() => setToggles((s) => ({ ...s, hotspot: !s.hotspot }))}><Radio size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')}><ImageIcon size={17} /></button>
-                <button className={`osien-circle-btn ${toggles.dnd ? 'active' : ''}`} onClick={() => setToggles((s) => ({ ...s, dnd: !s.dnd }))}><MinusCircle size={17} /></button>
+                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi & Internet"><Wifi size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('airplane')} title="Airplane Mode"><Plane size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('bluetooth')} title="Bluetooth"><Bluetooth size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Sound & DND"><MinusCircle size={17} /></button>
               </div>
 
-              {/* Right 2 Vertical Sliders (Brightness & Volume) */}
+              {/* Right 2 Smooth Touch-Drag Vertical Sliders (Real Brightness & Real Volume) */}
               <div style={{ display: 'flex', gap: 12 }}>
                 <div
                   className="osien-vslider-wrap"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pct = Math.round(((rect.bottom - e.clientY) / rect.height) * 100);
-                    updateBrightness(pct);
-                  }}
+                  style={{ touchAction: 'none' }}
+                  onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateBrightness); }}
+                  onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateBrightness); }}
                 >
                   <div className="osien-vslider-fill" style={{ height: `${brightness}%` }} />
-                  <Sun size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617' }} />
+                  <Sun size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617', pointerEvents: 'none' }} />
                 </div>
 
                 <div
                   className="osien-vslider-wrap"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const pct = Math.max(0, Math.min(100, Math.round(((rect.bottom - e.clientY) / rect.height) * 100)));
-                    setVolume(pct);
-                  }}
+                  style={{ touchAction: 'none' }}
+                  onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateVolume); }}
+                  onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateVolume); }}
                 >
                   <div className="osien-vslider-fill" style={{ height: `${volume}%` }} />
-                  <Volume2 size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617' }} />
+                  <Volume2 size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617', pointerEvents: 'none' }} />
                 </div>
               </div>
             </div>

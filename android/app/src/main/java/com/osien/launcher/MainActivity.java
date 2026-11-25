@@ -322,11 +322,48 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         public void launchApp(String packageName, String className) {
             runOnUiThread(() -> {
                 try {
-                    LauncherApps launcherApps = (LauncherApps) getSystemService(LAUNCHER_APPS_SERVICE);
-                    if (launcherApps != null) launcherApps.startMainActivity(
-                        new android.content.ComponentName(packageName, className), Process.myUserHandle(), null, null);
+                    if (className != null && !className.isEmpty()) {
+                        LauncherApps launcherApps = (LauncherApps) getSystemService(LAUNCHER_APPS_SERVICE);
+                        if (launcherApps != null) {
+                            launcherApps.startMainActivity(
+                                new android.content.ComponentName(packageName, className),
+                                Process.myUserHandle(), null, null
+                            );
+                            return;
+                        }
+                    }
+                    Intent launch = getPackageManager().getLaunchIntentForPackage(packageName);
+                    if (launch != null) {
+                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(launch);
+                    }
                 } catch (Exception ignored) {}
             });
+        }
+
+        @JavascriptInterface
+        public int getSystemVolume() {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    int cur = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                    int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                    return max > 0 ? Math.round(cur * 100f / max) : 50;
+                }
+            } catch (Exception ignored) {}
+            return 50;
+        }
+
+        @JavascriptInterface
+        public void setSystemVolume(int percent) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC);
+                    int target = Math.max(0, Math.min(max, Math.round(percent * max / 100f)));
+                    am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, target, 0);
+                }
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
@@ -340,8 +377,11 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 }
                 else if ("wifi".equals(panel)) intent = new Intent(Settings.ACTION_WIFI_SETTINGS);
                 else if ("bluetooth".equals(panel)) intent = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS);
+                else if ("airplane".equals(panel)) intent = new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS);
+                else if ("hotspot".equals(panel)) intent = new Intent(Settings.ACTION_WIRELESS_SETTINGS);
                 else if ("display".equals(panel)) intent = new Intent(Settings.ACTION_DISPLAY_SETTINGS);
                 else if ("sound".equals(panel) || "volume".equals(panel)) intent = new Intent(Settings.ACTION_SOUND_SETTINGS);
+                else if ("settings".equals(panel)) intent = new Intent(Settings.ACTION_SETTINGS);
                 if (intent != null) try { startActivity(intent); } catch (Exception ignored) {}
             });
         }
