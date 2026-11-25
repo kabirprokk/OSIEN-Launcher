@@ -44,6 +44,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     private boolean isInPocket = false;
     private float userBrightness = -1f; // -1 = system default
     private boolean launchedFromAod = false;
+    private boolean torchOn = false;
     private boolean launchedAsHome = false;
     private volatile boolean backHandlingEnabled = false;
     private final java.util.Map<String, String> appIconCache = new ConcurrentHashMap<>();
@@ -389,6 +390,21 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                     am.setStreamVolume(android.media.AudioManager.STREAM_RING, target, 0);
                 }
             } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public boolean toggleFlashlight() {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    android.hardware.camera2.CameraManager cm = (android.hardware.camera2.CameraManager) getSystemService(CAMERA_SERVICE);
+                    if (cm != null && cm.getCameraIdList().length > 0) {
+                        torchOn = !torchOn;
+                        cm.setTorchMode(cm.getCameraIdList()[0], torchOn);
+                        return torchOn;
+                    }
+                }
+            } catch (Exception ignored) {}
+            return false;
         }
 
         @JavascriptInterface

@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BatteryCharging, Bluetooth, Globe, Lock, MoreHorizontal,
   Plane, Search, Settings, Sun, Volume2, Bell, Wifi, X, Radio,
+  Flashlight, Image as ImageIcon, Phone, MessageCircle, Camera, Music,
+  Gamepad2, ShoppingBag, Mail, Calendar, Clock, Calculator, MapPin,
+  Shield, Sparkles, Play, Folder, Compass, Terminal, AppWindow,
 } from 'lucide-react';
 import { useBatteryTelemetry, splitPct } from '../engine/batteryEngine';
 import './launcher.css';
@@ -51,6 +54,27 @@ function loadInstalledApps() {
   return FALLBACK_APPS;
 }
 
+function getAppLucideIcon(app) {
+  const s = `${app.packageName || ''} ${app.label || ''}`.toLowerCase();
+  if (/phone|dialer|call/.test(s)) return Phone;
+  if (/whatsapp|telegram|message|sms|discord|signal|chat/.test(s)) return MessageCircle;
+  if (/camera|photo|gallery|edits/.test(s)) return Camera;
+  if (/chrome|brave|browser|firefox|edge|opera/.test(s)) return Compass;
+  if (/music|spotify|youtube|vlc|audio|podcast/.test(s)) return Play;
+  if (/game|chess|pubg|bgmi|clash|minecraft|roblox|cod/.test(s)) return Gamepad2;
+  if (/amazon|flipkart|blinkit|instamart|shop|myntra|swiggy|zomato/.test(s)) return ShoppingBag;
+  if (/gmail|mail|outlook/.test(s)) return Mail;
+  if (/calendar/.test(s)) return Calendar;
+  if (/clock|alarm|timer/.test(s)) return Clock;
+  if (/calc/.test(s)) return Calculator;
+  if (/map|uber|ola|chalo|nav/.test(s)) return MapPin;
+  if (/auth|shield|security|vpn|pay|fam/.test(s)) return Shield;
+  if (/gpt|ai|gemini|claude|assistant|perplexity/.test(s)) return Sparkles;
+  if (/drive|file|doc|note|pdf/.test(s)) return Folder;
+  if (/setting|aod|osien/.test(s)) return Settings;
+  if (/term|code|git|dev/.test(s)) return Terminal;
+  return AppWindow;
+}
 function categorizeApp(app) {
   const s = `${app.packageName || ''} ${app.label || ''}`.toLowerCase();
   if (/whatsapp|insta|telegram|snap|discord|twitter|facebook|messenger|reddit|signal|chat|mail|phone|dialer|message/.test(s)) return 'SOCIAL';
@@ -97,6 +121,16 @@ export default function LauncherHome() {
   const [btOn, setBtOn] = useState(() => {
     try { return Boolean(window.AndroidBattery?.isBluetoothEnabled?.()); } catch { return false; }
   });
+  const [torchOn, setTorchOn] = useState(false);
+
+  const toggleTorch = () => {
+    try {
+      const next = Boolean(window.AndroidBattery?.toggleFlashlight?.());
+      setTorchOn(next);
+    } catch {
+      setTorchOn((v) => !v);
+    }
+  };
 
   // Pins & Wallpaper
   const [dockPins, setDockPins] = useState(() => readJson('osien_dock_pins', null));
@@ -290,22 +324,27 @@ export default function LauncherHome() {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase();
   const dateStr = now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
 
-  const renderDiamond = (app, showLabel = false) => (
-    <button
-      key={app.packageName}
-      className="osien-diamond-btn"
-      onClick={() => launchApp(app)}
-      onTouchStart={() => startLongPress(app)}
-      onTouchEnd={cancelLongPress}
-      onTouchMove={cancelLongPress}
-      onContextMenu={(e) => { e.preventDefault(); setContextApp(app); }}
-    >
-      <div className="osien-diamond">
-        <span className="osien-diamond-glyph">{(app.label || '?').slice(0, 1).toUpperCase()}</span>
-      </div>
-      {showLabel && <span className="osien-app-label">{app.label}</span>}
-    </button>
-  );
+  const renderDiamond = (app, showLabel = false) => {
+    const IconComp = getAppLucideIcon(app);
+    return (
+      <button
+        key={app.packageName}
+        className="osien-diamond-btn"
+        onClick={() => launchApp(app)}
+        onTouchStart={() => startLongPress(app)}
+        onTouchEnd={cancelLongPress}
+        onTouchMove={cancelLongPress}
+        onContextMenu={(e) => { e.preventDefault(); setContextApp(app); }}
+      >
+        <div className="osien-diamond">
+          <span className="osien-diamond-glyph" style={{ display: 'grid', placeItems: 'center' }}>
+            <IconComp size={15} strokeWidth={1.9} />
+          </span>
+        </div>
+        {showLabel && <span className="osien-app-label">{app.label}</span>}
+      </button>
+    );
+  };
 
   // Screen 1: Totally Blank Invisible Gesture Lock
   if (locked) {
@@ -411,7 +450,7 @@ export default function LauncherHome() {
                 <div className="osien-pill-stack">
                   <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={16} /></button>
                   <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={16} /></button>
-                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => setPanel('wallpaper')} title="Wallpapers"><MoreHorizontal size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => setPanel('more')} title="More Tools"><MoreHorizontal size={16} /></button>
                 </div>
               </div>
 
@@ -495,6 +534,51 @@ export default function LauncherHome() {
                   ) : null
                 )
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3-DOT EXPANDED QUICK TOOLS MATRIX (Matches Image 2) */}
+      {panel === 'more' && (
+        <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
+          <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel('control')} title="Back to Control Panel">
+                <MoreHorizontal size={16} />
+              </button>
+              <span style={{ fontSize: 10, letterSpacing: '0.18em', color: 'rgba(248,250,252,0.5)' }}>OSIEN TOOLS</span>
+              <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel(null)}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="osien-matrix-grid">
+              {/* Left Dimmed Column */}
+              <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('display')} title="Display"><Sun size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Sound"><Volume2 size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={16} /></button>
+              </div>
+
+              {/* Center Highlighted Primary Tools Column */}
+              <div className="osien-matrix-center">
+                <button className={`osien-circle-btn ${torchOn ? 'active' : ''}`} onClick={toggleTorch} title="Flashlight"><Flashlight size={16} /></button>
+                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => { setPanel(null); window.dispatchEvent(new CustomEvent('osien-open-battery')); }} title="AOD Studio"><BatteryCharging size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => { setPanel(null); setGestureBuffer([]); setLocked(true); }} title="Gesture Lock"><Lock size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Internet"><Wifi size={16} /></button>
+              </div>
+
+              {/* Right Dimmed Column */}
+              <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => setPanel('drawer')} title="Search"><Search size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={16} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Ringtone"><Bell size={16} /></button>
+              </div>
             </div>
           </div>
         </div>
