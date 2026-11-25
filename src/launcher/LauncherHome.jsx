@@ -54,6 +54,40 @@ function loadInstalledApps() {
   return FALLBACK_APPS;
 }
 
+const iconMemCache = new Map();
+function AppDiamondIcon({ app }) {
+  const key = `${app.packageName}:${app.className || ''}`;
+  const [src, setSrc] = useState(() => app.icon || iconMemCache.get(key) || '');
+
+  useEffect(() => {
+    if (src) return;
+    let active = true;
+    const id = requestAnimationFrame(() => {
+      try {
+        const bridge = window.AndroidBattery;
+        if (bridge && typeof bridge.getAppIcon === 'function') {
+          const uri = bridge.getAppIcon(app.packageName, app.className || '');
+          if (uri && active) {
+            iconMemCache.set(key, uri);
+            setSrc(uri);
+          }
+        }
+      } catch { /* ignore */ }
+    });
+    return () => { active = false; cancelAnimationFrame(id); };
+  }, [app.packageName, app.className, key, src]);
+
+  if (src) {
+    return <img src={src} alt={app.label} className="osien-diamond-img" loading="lazy" decoding="async" />;
+  }
+  const IconComp = getAppLucideIcon(app);
+  return (
+    <span className="osien-diamond-glyph" style={{ display: 'grid', placeItems: 'center' }}>
+      <IconComp size={15} strokeWidth={1.9} />
+    </span>
+  );
+}
+
 function getAppLucideIcon(app) {
   const s = `${app.packageName || ''} ${app.label || ''}`.toLowerCase();
   if (/phone|dialer|call/.test(s)) return Phone;
@@ -140,6 +174,47 @@ export default function LauncherHome() {
   const fileInputRef = useRef(null);
   const homeTouchRef = useRef(null);
   const longPressTimer = useRef(null);
+  const drawerScrollRef = useRef(null);
+  const sheetSwipeRef = useRef(null);
+  const [sheetDragY, setSheetDragY] = useState(0);
+
+  const onSheetTouchStart = (e, checkScroll = false) => {
+    e.stopPropagation();
+    if (checkScroll && drawerScrollRef.current && drawerScrollRef.current.scrollTop > 4) {
+      sheetSwipeRef.current = null;
+      return;
+    }
+    const t = e.touches[0];
+    sheetSwipeRef.current = { y: t.clientY, time: Date.now() };
+  };
+
+  const onSheetTouchMove = (e) => {
+    if (!sheetSwipeRef.current) return;
+    const dy = e.touches[0].clientY - sheetSwipeRef.current.y;
+    if (dy > 0) {
+      setSheetDragY(dy);
+    }
+  };
+
+  const onSheetTouchEnd = (e) => {
+    e.stopPropagation();
+    if (!sheetSwipeRef.current) return;
+    const dy = e.changedTouches[0].clientY - sheetSwipeRef.current.y;
+    const dt = Math.max(1, Date.now() - sheetSwipeRef.current.time);
+    const velocity = dy / dt;
+    sheetSwipeRef.current = null;
+    if (dy > 72 || velocity > 0.42) {
+      setSheetDragY(0);
+      setPanel(null);
+      setQuery('');
+    } else {
+      setSheetDragY(0);
+    }
+  };
+
+  const sheetDragStyle = sheetDragY > 0
+    ? { transform: `translate3d(0, ${sheetDragY}px, 0)`, transition: 'none' }
+    : { transform: 'translate3d(0, 0, 0)', transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)' };
 
   const { telemetry } = useBatteryTelemetry({
     capacityMah: Number(localStorage.getItem('ov_cap') || 5000),
@@ -324,27 +399,22 @@ export default function LauncherHome() {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase();
   const dateStr = now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
 
-  const renderDiamond = (app, showLabel = false) => {
-    const IconComp = getAppLucideIcon(app);
-    return (
-      <button
-        key={app.packageName}
-        className="osien-diamond-btn"
-        onClick={() => launchApp(app)}
-        onTouchStart={() => startLongPress(app)}
-        onTouchEnd={cancelLongPress}
-        onTouchMove={cancelLongPress}
-        onContextMenu={(e) => { e.preventDefault(); setContextApp(app); }}
-      >
-        <div className="osien-diamond">
-          <span className="osien-diamond-glyph" style={{ display: 'grid', placeItems: 'center' }}>
-            <IconComp size={15} strokeWidth={1.9} />
-          </span>
-        </div>
-        {showLabel && <span className="osien-app-label">{app.label}</span>}
-      </button>
-    );
-  };
+  const renderDiamond = (app, showLabel = false) => (
+    <button
+      key={app.packageName}
+      className="osien-diamond-btn"
+      onClick={() => launchApp(app)}
+      onTouchStart={() => startLongPress(app)}
+      onTouchEnd={cancelLongPress}
+      onTouchMove={cancelLongPress}
+      onContextMenu={(e) => { e.preventDefault(); setContextApp(app); }}
+    >
+      <div className="osien-diamond">
+        <AppDiamondIcon app={app} />
+      </div>
+      {showLabel && <span className="osien-app-label">{app.label}</span>}
+    </button>
+  );
 
   // Screen 1: Totally Blank Invisible Gesture Lock
   if (locked) {
@@ -425,7 +495,14 @@ export default function LauncherHome() {
       {/* EXACT CONTROL PANEL (Image 3: Top Brightness + Wi-Fi/BT/Settings + Globe/Airplane/Hotspot/More + Media & Ringtone Sliders) */}
       {panel === 'control' && (
         <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
-          <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="osien-bottom-card osien-glass"
+            style={sheetDragStyle}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => onSheetTouchStart(e, false)}
+            onTouchMove={onSheetTouchMove}
+            onTouchEnd={onSheetTouchEnd}
+          >
             {/* Top Horizontal Brightness Slider */}
             <div
               className="osien-hslider-wrap"
@@ -486,9 +563,11 @@ export default function LauncherHome() {
         <div className="osien-bottom-card-backdrop" onClick={() => { setPanel(null); setQuery(''); }}>
           <div
             className="osien-drawer-card osien-glass"
+            style={sheetDragStyle}
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
+            onTouchStart={(e) => onSheetTouchStart(e, true)}
+            onTouchMove={onSheetTouchMove}
+            onTouchEnd={onSheetTouchEnd}
           >
             <div className="sheet-handle" style={{ marginBottom: 12 }} />
             <div className="osien-search-bar" style={{ marginBottom: 8 }}>
@@ -512,7 +591,7 @@ export default function LauncherHome() {
               )}
             </div>
 
-            <div className="osien-drawer-scroll">
+            <div className="osien-drawer-scroll" ref={drawerScrollRef}>
               {query.trim() ? (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px 4px', paddingTop: 8 }}>
                   {apps
@@ -542,7 +621,14 @@ export default function LauncherHome() {
       {/* 3-DOT EXPANDED QUICK TOOLS MATRIX (Matches Image 2) */}
       {panel === 'more' && (
         <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
-          <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="osien-bottom-card osien-glass"
+            style={sheetDragStyle}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => onSheetTouchStart(e, false)}
+            onTouchMove={onSheetTouchMove}
+            onTouchEnd={onSheetTouchEnd}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel('control')} title="Back to Control Panel">
                 <MoreHorizontal size={16} />
