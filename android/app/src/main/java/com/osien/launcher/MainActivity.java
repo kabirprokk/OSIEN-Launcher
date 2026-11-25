@@ -176,15 +176,6 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     }
 
     @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
-        if (gestureLockActive) {
-            return; // Block Back button while OSIEN Invisible Gesture Lock is active
-        }
-        super.onBackPressed();
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
         if (launchedFromAod && sensorManager != null && proximitySensor != null) {
