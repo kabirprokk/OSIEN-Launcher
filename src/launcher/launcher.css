@@ -1,5 +1,6 @@
-/* OSIEN Launcher — Liquid Glass & Performance-First 60/120fps Styles */
+/* OSIEN Launcher v0.1.0 — Exact 7-Screen Map + Liquid Glass + 120fps GPU */
 .osien-home {
+  --osien-accent: #38bdf8;
   position: relative;
   width: 100%;
   height: 100dvh;
@@ -10,7 +11,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: calc(var(--safe-top) + 14px) 18px calc(var(--safe-bottom) + 14px);
+  padding: calc(var(--safe-top) + 16px) 18px calc(var(--safe-bottom) + 14px);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -22,255 +23,296 @@
   z-index: 0;
   background-size: cover;
   background-position: center;
-  transition: opacity 0.35s ease;
 }
 
 .osien-bg-scrim {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(180deg, rgba(4, 6, 12, 0.32) 0%, rgba(4, 6, 12, 0.14) 50%, rgba(4, 6, 12, 0.56) 100%);
+  background: linear-gradient(180deg, rgba(4, 6, 12, 0.35) 0%, rgba(4, 6, 12, 0.14) 50%, rgba(4, 6, 12, 0.65) 100%);
   pointer-events: none;
 }
 
-/* Liquid Glass Surface — fast GPU compositing */
 .osien-glass {
-  background: rgba(18, 22, 32, 0.58);
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: rgba(15, 20, 30, 0.66);
+  backdrop-filter: blur(18px) saturate(165%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-/* Top Status / Brand Pill */
-.osien-top-bar {
-  position: relative;
-  z-index: 5;
+/* Screen 1: Invisible Gesture Lock */
+.osien-gesture-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #000000;
+  touch-action: none;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-end;
+  padding-bottom: calc(var(--safe-bottom) + 28px);
 }
 
-.osien-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #f1f5f9;
-  cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.osien-pill:active {
-  transform: scale(0.95);
-}
-
-/* Hero Clock & Live Battery Widget */
+/* Screen 2: Hero Clock + Vertical Battery Card */
 .osien-hero {
   position: relative;
   z-index: 5;
-  margin-top: 14px;
-  padding: 18px 20px;
+  padding: 20px 20px;
   border-radius: 26px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
 }
 
 .osien-clock-time {
   font-family: var(--font-display);
-  font-size: 44px;
-  font-weight: 400;
-  line-height: 0.96;
-  letter-spacing: -0.04em;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
 .osien-clock-date {
-  font-size: 12px;
-  color: rgba(241, 245, 249, 0.62);
-  margin-top: 5px;
-  letter-spacing: 0.02em;
-}
-
-.osien-bat-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  cursor: pointer;
-}
-
-.osien-bat-pct {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.osien-bat-sub {
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(241, 245, 249, 0.55);
+  color: rgba(241, 245, 249, 0.65);
+  margin-top: 8px;
 }
 
-/* Pinned Home App Grid */
-.osien-grid-wrap {
-  position: relative;
-  z-index: 5;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 16px 0 18px;
-}
-
-.osien-app-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px 10px;
-}
-
-.osien-app-item {
+.osien-bat-right {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
+}
+
+.osien-bat-cell {
+  width: 30px;
+  height: 52px;
+  border-radius: 9px;
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  padding: 3px;
+  display: flex;
+  align-items: flex-end;
+  position: relative;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.osien-bat-cap {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 3.5px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.osien-bat-fill {
+  width: 100%;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+  transition: height 0.25s linear;
+}
+
+/* Middle Widgets Row (Widget 1 + Compact Square Widget) */
+.osien-widgets-row {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1.65fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.osien-widget-card {
+  border-radius: 22px;
+  padding: 16px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+
+.osien-widget-card:active {
+  transform: scale(0.97);
+}
+
+/* Screen 3: Dual Side Edge Handles */
+.osien-edge-handle {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 96px);
+  width: 5px;
+  height: 112px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.24);
+  z-index: 15;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.osien-edge-handle.left { left: 5px; }
+.osien-edge-handle.right { right: 5px; }
+.osien-edge-handle:active { background: var(--osien-accent); transform: scaleY(1.08); }
+
+/* Bottom Floating Diamond Dock */
+.osien-dock {
+  position: relative;
+  z-index: 5;
+  border-radius: 24px;
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+/* Precision 45-deg Geometric Diamond Tile */
+.osien-diamond-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
   background: transparent;
   border: none;
   color: #f8fafc;
   cursor: pointer;
-  padding: 4px;
+  padding: 2px;
   transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.osien-app-item:active {
-  transform: scale(0.9);
+.osien-diamond-btn:active {
+  transform: scale(0.88);
 }
 
-.osien-icon-box {
-  width: 44px;
-  height: 44px;
-  margin: 6px 0;
-  border-radius: 10px;
+.osien-diamond {
+  width: 34px;
+  height: 34px;
+  margin: 5px 0;
+  border-radius: 8px;
   transform: rotate(45deg);
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  background: rgba(139, 92, 246, 0.22);
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .osien-diamond-glyph {
   transform: rotate(-45deg);
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: 600;
   color: #f8fafc;
 }
 
 .osien-app-label {
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(248, 250, 252, 0.86);
-  max-width: 72px;
+  font-size: 10px;
+  color: rgba(248, 250, 252, 0.8);
+  max-width: 56px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* Floating Liquid Glass Dock */
-.osien-dock {
-  position: relative;
-  z-index: 5;
-  border-radius: 26px;
-  padding: 11px 14px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
-.osien-gesture-hint {
-  position: relative;
-  z-index: 5;
-  width: 42px;
-  height: 4px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.28);
-  margin: 10px auto 0;
-}
-
-/* GPU-Accelerated Overlays (Drawer, Spotlight, Control Center, Settings) */
-.osien-overlay {
+/* Screen 4 & 5: Bottom Liquid Glass Pop-Up Cards */
+.osien-bottom-card-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
-  background: rgba(4, 6, 12, 0.82);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  z-index: 45;
+  background: rgba(2, 4, 10, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 14px calc(var(--safe-bottom) + 14px);
+  animation: osien-fade-in 0.18s ease;
+}
+
+.osien-bottom-card {
+  width: 100%;
+  max-width: 390px;
+  border-radius: 28px;
+  padding: 18px;
+  animation: osien-slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@keyframes osien-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes osien-slide-up { from { transform: translate3d(0, 40px, 0); opacity: 0; } to { transform: translate3d(0, 0, 0); opacity: 1; } }
+
+/* Vertical iOS Sliders (Screen 4) */
+.osien-vslider-wrap {
+  width: 44px;
+  height: 132px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: calc(var(--safe-top) + 16px) 18px calc(var(--safe-bottom) + 16px);
-  animation: osien-fade-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform, opacity;
+  justify-content: flex-end;
+  cursor: pointer;
 }
 
-@keyframes osien-fade-up {
-  from { opacity: 0; transform: translate3d(0, 24px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+.osien-vslider-fill {
+  width: 100%;
+  background: #f8fafc;
+  transition: height 0.1s linear;
 }
 
-.osien-search-bar {
+.osien-circle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.osien-circle-btn.active {
+  background: var(--osien-accent);
+  color: #020617;
+  border-color: var(--osien-accent);
+}
+
+/* Screen 7: Categorized Swipe-Up App Drawer */
+.osien-drawer-card {
+  width: 100%;
+  max-width: 420px;
+  height: 76dvh;
+  border-radius: 30px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  animation: osien-slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.osien-cat-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  margin-bottom: 16px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.16em;
+  color: rgba(248, 250, 252, 0.55);
+  margin: 14px 0 8px;
 }
 
-.osien-search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #fff;
-  font-size: 14px;
-  font-family: var(--font-sans);
-}
-
-.osien-drawer-scroll {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 24px;
-}
-
-.osien-cc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.osien-cc-tile {
-  padding: 16px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #f8fafc;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
+.osien-cat-line {
+  width: 24px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.24);
 }
