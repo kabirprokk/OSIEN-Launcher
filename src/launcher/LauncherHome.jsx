@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BatteryCharging, Bluetooth, Image as ImageIcon, Lock, MoreHorizontal,
-  Plane, Search, Settings, Sun, Volume2, Wifi, X, Radio, MinusCircle,
+  BatteryCharging, Bluetooth, Globe, Lock, MoreHorizontal,
+  Plane, Search, Settings, Sun, Volume2, Bell, Wifi, X, Radio,
 } from 'lucide-react';
 import { useBatteryTelemetry, splitPct } from '../engine/batteryEngine';
 import './launcher.css';
@@ -87,6 +87,16 @@ export default function LauncherHome() {
     } catch { /* ignore */ }
     return 55;
   });
+  const [ringtone, setRingtone] = useState(() => {
+    try {
+      const r = Number(window.AndroidBattery?.getRingtoneVolume?.());
+      if (Number.isFinite(r) && r >= 0) return r;
+    } catch { /* ignore */ }
+    return 60;
+  });
+  const [btOn, setBtOn] = useState(() => {
+    try { return Boolean(window.AndroidBattery?.isBluetoothEnabled?.()); } catch { return false; }
+  });
 
   // Pins & Wallpaper
   const [dockPins, setDockPins] = useState(() => readJson('osien_dock_pins', null));
@@ -159,6 +169,27 @@ export default function LauncherHome() {
     const clamped = Math.max(0, Math.min(100, val));
     setVolume(clamped);
     try { window.AndroidBattery?.setSystemVolume?.(clamped); } catch { /* ignore */ }
+  };
+
+  const updateRingtone = (val) => {
+    const clamped = Math.max(0, Math.min(100, val));
+    setRingtone(clamped);
+    try { window.AndroidBattery?.setRingtoneVolume?.(clamped); } catch { /* ignore */ }
+  };
+
+  const toggleBtDirect = () => {
+    try {
+      const next = Boolean(window.AndroidBattery?.toggleBluetoothDirect?.());
+      setBtOn(next);
+    } catch {
+      setBtOn((v) => !v);
+    }
+  };
+
+  const handleHSliderPointer = (e, setter) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(5, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+    setter(pct);
   };
 
   const openNativePanel = (name) => {
@@ -240,11 +271,9 @@ export default function LauncherHome() {
     const startX = homeTouchRef.current.x;
     homeTouchRef.current = null;
 
-    if (startX < 44 && dx > 42) {
+    if ((startX < 72 && dx > 30) || (startX > window.innerWidth - 72 && dx < -30)) {
       setPanel('control');
-    } else if (startX > window.innerWidth - 44 && dx < -42) {
-      setPanel('matrix');
-    } else if (dy < -52 && Math.abs(dy) > Math.abs(dx)) {
+    } else if (dy < -48 && Math.abs(dy) > Math.abs(dx)) {
       setPanel('drawer');
     }
   };
@@ -295,95 +324,117 @@ export default function LauncherHome() {
       <div className="osien-bg-layer" style={bgStyle} />
       <div className="osien-bg-scrim" />
 
-      {/* Top Section: Hero Card + Middle Widgets Row (Screen 2) */}
-      <div style={{ position: 'relative', zIndex: 5 }}>
-        <div className="osien-hero osien-glass">
-          <div>
-            <div className="osien-clock-time tabular">{timeStr}</div>
-            <div className="osien-clock-date">{dateStr}</div>
+      {/* Home Stage (scales down smoothly like OxygenOS/iOS when panel/drawer opens) */}
+      <div className={`osien-home-stage ${panel ? 'dimmed' : ''}`}>
+        <div>
+          <div className="osien-hero osien-glass">
+            <div>
+              <div className="osien-clock-time tabular">{timeStr}</div>
+              <div className="osien-clock-date">{dateStr}</div>
+            </div>
+
+            <div className="osien-bat-right" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
+              <div className="tabular" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(248,250,252,0.72)' }}>
+                {whole}.{dec}%
+              </div>
+              <div className="osien-bat-cell">
+                <div className="osien-bat-cap" />
+                <div className="osien-bat-fill" style={{ height: `${Math.max(8, telemetry.pct)}%` }} />
+              </div>
+            </div>
           </div>
 
-          <div className="osien-bat-right" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
-            <div className="tabular" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(248,250,252,0.72)' }}>
-              {whole}.{dec}%
+          {/* Widget 1 + Compact Square Widget */}
+          <div className="osien-widgets-row">
+            <div className="osien-widget-card osien-glass" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'rgba(248,250,252,0.5)' }}>OSIEN POWER</span>
+                <BatteryCharging size={14} color="#34d399" />
+              </div>
+              <div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>
+                {telemetry.chargeState === 'charging' ? `${telemetry.watts.toFixed(1)}W Live` : telemetry.chargeState === 'paused' ? 'Smart Pause' : 'AOD Studio'}
+              </div>
             </div>
-            <div className="osien-bat-cell">
-              <div className="osien-bat-cap" />
-              <div className="osien-bat-fill" style={{ height: `${Math.max(8, telemetry.pct)}%` }} />
+
+            <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => { setGestureBuffer([]); setLocked(true); }}>
+              <Lock size={20} color="#38bdf8" />
+              <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'rgba(248,250,252,0.65)' }}>GESTURE LOCK</span>
             </div>
           </div>
         </div>
 
-        {/* Widget 1 + Compact Square Widget */}
-        <div className="osien-widgets-row">
-          <div className="osien-widget-card osien-glass" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'rgba(248,250,252,0.5)' }}>OSIEN POWER</span>
-              <BatteryCharging size={14} color="#34d399" />
-            </div>
-            <div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>
-              {telemetry.chargeState === 'charging' ? `${telemetry.watts.toFixed(1)}W Live` : telemetry.chargeState === 'paused' ? 'Smart Pause' : 'AOD Studio'}
-            </div>
-          </div>
-
-          <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => { setGestureBuffer([]); setLocked(true); }}>
-            <Lock size={20} color="#38bdf8" />
-            <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'rgba(248,250,252,0.65)' }}>GESTURE LOCK</span>
-          </div>
+        {/* Bottom Floating Diamond Dock */}
+        <div className="osien-dock osien-glass">
+          {effectiveDock.map((app) => renderDiamond(app, false))}
         </div>
       </div>
 
-      {/* Screen 3: Dual Side Edge Handles (Left -> Control Panel, Right -> Quick Matrix Panel) */}
-      <div className="osien-edge-handle left" onClick={() => setPanel('control')} title="Control Panel" />
-      <div className="osien-edge-handle right" onClick={() => setPanel('matrix')} title="Quick Matrix" />
-
-      {/* Bottom Floating Diamond Dock */}
-      <div className="osien-dock osien-glass">
-        {effectiveDock.map((app) => renderDiamond(app, false))}
-      </div>
+      {/* Both Left & Right Wide Edge Zones open the Control Panel cleanly */}
+      {!panel && (
+        <>
+          <div className="osien-edge-zone left" onClick={() => setPanel('control')} title="Control Panel">
+            <div className="osien-edge-bar" />
+          </div>
+          <div className="osien-edge-zone right" onClick={() => setPanel('control')} title="Control Panel">
+            <div className="osien-edge-bar" />
+          </div>
+        </>
+      )}
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleWallpaperUpload} />
 
-      {/* SCREEN 4: BOTTOM LIQUID GLASS CONTROL PANEL */}
+      {/* EXACT CONTROL PANEL (Image 3: Top Brightness + Wi-Fi/BT/Settings + Globe/Airplane/Hotspot/More + Media & Ringtone Sliders) */}
       {panel === 'control' && (
         <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
           <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
-            {/* Top Progress / Media Strip */}
-            <div style={{ height: 14, borderRadius: 99, background: 'rgba(255,255,255,0.14)', overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ width: `${Math.max(12, telemetry.pct)}%`, height: '100%', background: '#f8fafc', borderRadius: 99 }} />
+            {/* Top Horizontal Brightness Slider */}
+            <div
+              className="osien-hslider-wrap"
+              onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleHSliderPointer(e, updateBrightness); }}
+              onPointerMove={(e) => { if (e.buttons > 0) handleHSliderPointer(e, updateBrightness); }}
+            >
+              <div className="osien-hslider-fill" style={{ width: `${brightness}%` }} />
+              <Sun size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: brightness > 15 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
-              {/* Left Circular Quick Toggles -> Real Android System Panels */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi & Internet"><Wifi size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('airplane')} title="Airplane Mode"><Plane size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('bluetooth')} title="Bluetooth"><Bluetooth size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Sound & DND"><MinusCircle size={17} /></button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 12 }}>
+              {/* Col 1: Wi-Fi, Direct Bluetooth, Settings */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
+                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={17} /></button>
+                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={17} /></button>
               </div>
 
-              {/* Right 2 Smooth Touch-Drag Vertical Sliders (Real Brightness & Real Volume) */}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div
-                  className="osien-vslider-wrap"
-                  style={{ touchAction: 'none' }}
-                  onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateBrightness); }}
-                  onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateBrightness); }}
-                >
-                  <div className="osien-vslider-fill" style={{ height: `${brightness}%` }} />
-                  <Sun size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617', pointerEvents: 'none' }} />
+              {/* Col 2: Globe (Mobile Data) + Vertical Pill (Airplane, Hotspot, More/Wallpapers) */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={17} /></button>
+                <div className="osien-pill-stack">
+                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => setPanel('wallpaper')} title="Wallpapers"><MoreHorizontal size={16} /></button>
                 </div>
+              </div>
 
+              {/* Right: 2 Vertical Sliders (Media Sound & Ringtone Sound) */}
+              <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
                 <div
                   className="osien-vslider-wrap"
-                  style={{ touchAction: 'none' }}
+                  style={{ height: 152, touchAction: 'none' }}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateVolume); }}
                   onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateVolume); }}
                 >
                   <div className="osien-vslider-fill" style={{ height: `${volume}%` }} />
-                  <Volume2 size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: '#020617', pointerEvents: 'none' }} />
+                  <Volume2 size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: volume > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
+                </div>
+
+                <div
+                  className="osien-vslider-wrap"
+                  style={{ height: 152, touchAction: 'none' }}
+                  onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateRingtone); }}
+                  onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateRingtone); }}
+                >
+                  <div className="osien-vslider-fill" style={{ height: `${ringtone}%` }} />
+                  <Bell size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: ringtone > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
                 </div>
               </div>
             </div>
@@ -391,55 +442,58 @@ export default function LauncherHome() {
         </div>
       )}
 
-      {/* SCREEN 5: BOTTOM LIQUID GLASS QUICK MATRIX PANEL */}
-      {panel === 'matrix' && (
-        <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
-          <div className="osien-bottom-card osien-glass" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <button className="osien-circle-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel('wallpaper')}>
-                <MoreHorizontal size={15} />
-              </button>
-              <span style={{ fontSize: 11, letterSpacing: '0.16em', color: 'rgba(248,250,252,0.5)' }}>QUICK LAUNCH</span>
-              <button className="osien-circle-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel(null)}>
-                <X size={14} />
-              </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, padding: '8px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.05)' }}>
-              {apps.slice(0, 12).map((app) => renderDiamond(app, true))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SCREEN 7: SWIPE-UP CATEGORIZED DIAMOND APP DRAWER */}
+      {/* FIXED SWIPE-UP CATEGORIZED DIAMOND APP DRAWER */}
       {panel === 'drawer' && (
         <div className="osien-bottom-card-backdrop" onClick={() => { setPanel(null); setQuery(''); }}>
-          <div className="osien-drawer-card osien-glass" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="osien-drawer-card osien-glass"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             <div className="sheet-handle" style={{ marginBottom: 12 }} />
             <div className="osien-search-bar" style={{ marginBottom: 8 }}>
               <Search size={16} color="#a78bfa" />
               <input
+                type="search"
                 className="osien-search-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search apps..."
+                autoComplete="off"
+                autoCorrect="off"
               />
-              {query && <X size={15} color="#94a3b8" onClick={() => setQuery('')} />}
+              {query && (
+                <button
+                  onClick={() => setQuery('')}
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
 
             <div className="osien-drawer-scroll">
-              {(['SOCIAL', 'GAMES', 'UTILITY']).map((cat) =>
-                categorized[cat].length > 0 ? (
-                  <div key={cat}>
-                    <div className="osien-cat-header">
-                      <span className="osien-cat-line" />
-                      <span>{cat}</span>
+              {query.trim() ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px 4px', paddingTop: 8 }}>
+                  {apps
+                    .filter((a) => `${a.label || ''} ${a.packageName || ''}`.toLowerCase().includes(query.trim().toLowerCase()))
+                    .map((app) => renderDiamond(app, true))}
+                </div>
+              ) : (
+                (['SOCIAL', 'GAMES', 'UTILITY']).map((cat) =>
+                  categorized[cat].length > 0 ? (
+                    <div key={cat}>
+                      <div className="osien-cat-header">
+                        <span className="osien-cat-line" />
+                        <span>{cat}</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px 4px' }}>
+                        {categorized[cat].map((app) => renderDiamond(app, true))}
+                      </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px 4px' }}>
-                      {categorized[cat].map((app) => renderDiamond(app, true))}
-                    </div>
-                  </div>
-                ) : null
+                  ) : null
+                )
               )}
             </div>
           </div>

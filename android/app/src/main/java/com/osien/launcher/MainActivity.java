@@ -367,6 +367,69 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         }
 
         @JavascriptInterface
+        public int getRingtoneVolume() {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    int cur = am.getStreamVolume(android.media.AudioManager.STREAM_RING);
+                    int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_RING);
+                    return max > 0 ? Math.round(cur * 100f / max) : 50;
+                }
+            } catch (Exception ignored) {}
+            return 50;
+        }
+
+        @JavascriptInterface
+        public void setRingtoneVolume(int percent) {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+                if (am != null) {
+                    int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_RING);
+                    int target = Math.max(0, Math.min(max, Math.round(percent * max / 100f)));
+                    am.setStreamVolume(android.media.AudioManager.STREAM_RING, target, 0);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public boolean isBluetoothEnabled() {
+            try {
+                android.bluetooth.BluetoothAdapter adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                return adapter != null && adapter.isEnabled();
+            } catch (Exception ignored) { return false; }
+        }
+
+        @JavascriptInterface
+        public boolean toggleBluetoothDirect() {
+            try {
+                android.bluetooth.BluetoothAdapter adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                if (adapter == null) return false;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    runOnUiThread(() -> requestPermissions(new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, 201));
+                    return adapter.isEnabled();
+                }
+                if (adapter.isEnabled()) {
+                    adapter.disable();
+                    return false;
+                } else {
+                    boolean ok = adapter.enable();
+                    if (!ok) {
+                        runOnUiThread(() -> {
+                            try { startActivity(new Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)); } catch (Exception ignored) {}
+                        });
+                    }
+                    return true;
+                }
+            } catch (Exception ignored) {
+                runOnUiThread(() -> {
+                    try { startActivity(new Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)); } catch (Exception ignored2) {}
+                });
+                return false;
+            }
+        }
+
+        @JavascriptInterface
         public void openSystemPanel(String panel) {
             runOnUiThread(() -> {
                 Intent intent = null;
