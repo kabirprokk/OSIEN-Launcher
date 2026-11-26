@@ -554,44 +554,42 @@ export default function LauncherHome() {
               <Sun size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: brightness > 15 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', gap: 12 }}>
-              {/* Col 1: Wi-Fi, Direct Bluetooth, Settings */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
-                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={17} /></button>
-                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={17} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={17} /></button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
+              {/* Col 1: Wi-Fi, Direct Bluetooth, Settings (3 stacked 50px circles) */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 174 }}>
+                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={19} /></button>
+                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={19} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={19} /></button>
               </div>
 
-              {/* Col 2: Globe (Mobile Data) + Vertical Pill (Airplane, Hotspot, More/Wallpapers) */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={17} /></button>
+              {/* Col 2: Globe (50px circle) + Vertical Pill (Airplane, Hotspot, 3-Dots) */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', height: 174 }}>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={19} /></button>
                 <div className="osien-pill-stack">
-                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={16} /></button>
-                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={16} /></button>
-                  <button className="osien-circle-btn" style={{ width: 32, height: 32, border: 'none', background: 'transparent' }} onClick={() => setPanel('more')} title="More Tools"><MoreHorizontal size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 34, height: 34, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={17} /></button>
+                  <button className="osien-circle-btn" style={{ width: 34, height: 34, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={17} /></button>
+                  <button className="osien-circle-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel('more')} title="More Tools"><MoreHorizontal size={16} /></button>
                 </div>
               </div>
 
-              {/* Right: 2 Vertical Sliders (Media Sound & Ringtone Sound) */}
-              <div style={{ display: 'flex', gap: 12, marginLeft: 'auto' }}>
+              {/* Right: 2 Vertical Sliders (Media Sound & Ringtone Sound — 52x174px) */}
+              <div style={{ display: 'flex', gap: 14, marginLeft: 'auto' }}>
                 <div
                   className="osien-vslider-wrap"
-                  style={{ height: 152, touchAction: 'none' }}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateVolume); }}
                   onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateVolume); }}
                 >
                   <div className="osien-vslider-fill" style={{ height: `${volume}%` }} />
-                  <Volume2 size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: volume > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
+                  <Volume2 size={16} style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', color: volume > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
                 </div>
 
                 <div
                   className="osien-vslider-wrap"
-                  style={{ height: 152, touchAction: 'none' }}
                   onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleVSliderPointer(e, updateRingtone); }}
                   onPointerMove={(e) => { if (e.buttons > 0) handleVSliderPointer(e, updateRingtone); }}
                 >
                   <div className="osien-vslider-fill" style={{ height: `${ringtone}%` }} />
-                  <Bell size={15} style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', color: ringtone > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
+                  <Bell size={16} style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', color: ringtone > 18 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
                 </div>
               </div>
             </div>
@@ -660,52 +658,58 @@ export default function LauncherHome() {
         </div>
       </div>
 
-      {/* 3-DOT EXPANDED QUICK TOOLS MATRIX (Matches Image 2) */}
+      {/* 3-DOT EXPANDED QUICK TOOLS MATRIX (Exact Match to Image 2) */}
       {panel === 'more' && (
         <div className="osien-bottom-card-backdrop" onClick={() => setPanel(null)}>
           <div
             className="osien-bottom-card osien-glass"
-            style={sheetDragStyle}
+            style={{ ...sheetDragStyle, padding: 14 }}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => onSheetTouchStart(e, false)}
             onTouchMove={onSheetTouchMove}
             onTouchEnd={onSheetTouchEnd}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel('control')} title="Back to Control Panel">
-                <MoreHorizontal size={16} />
-              </button>
-              <span style={{ fontSize: 10, letterSpacing: '0.18em', color: 'rgba(248,250,252,0.5)' }}>OSIEN TOOLS</span>
-              <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel(null)}>
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="osien-matrix-grid">
-              {/* Left Dimmed Column */}
-              <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('display')} title="Display"><Sun size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Sound"><Volume2 size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={16} /></button>
+            <div className="osien-matrix-inner">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel('control')} title="Back to Control Panel">
+                  <MoreHorizontal size={16} />
+                </button>
+                <span style={{ fontSize: 10, letterSpacing: '0.18em', color: 'rgba(248,250,252,0.55)' }}>OSIEN MATRIX</span>
+                <button className="osien-circle-btn" style={{ width: 34, height: 34 }} onClick={() => setPanel(null)}>
+                  <X size={14} />
+                </button>
               </div>
 
-              {/* Center Highlighted Primary Tools Column */}
-              <div className="osien-matrix-center">
-                <button className={`osien-circle-btn ${torchOn ? 'active' : ''}`} onClick={toggleTorch} title="Flashlight"><Flashlight size={16} /></button>
-                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => { setPanel(null); window.dispatchEvent(new CustomEvent('osien-open-battery')); }} title="AOD Studio"><BatteryCharging size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={16} /></button>
-                <button className={`osien-circle-btn ${autoLockOn ? 'active' : ''}`} onClick={() => setPanel('locksetup')} title="Gesture Lock Settings"><Lock size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Internet"><Wifi size={16} /></button>
-              </div>
+              <div className="osien-matrix-grid">
+                {/* Left Column */}
+                <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('display')} title="Display"><Sun size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('sound')} title="Sound"><Volume2 size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('internet')} title="Data"><Globe size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('sound')} title="Ringtone"><Bell size={15} /></button>
+                </div>
 
-              {/* Right Dimmed Column */}
-              <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => setPanel('drawer')} title="Search"><Search size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={16} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('sound')} title="Ringtone"><Bell size={16} /></button>
+                {/* Center Highlighted Primary Tools Column */}
+                <div className="osien-matrix-center">
+                  <button className={`osien-circle-btn ${torchOn ? 'active' : ''}`} style={{ width: 40, height: 40 }} onClick={toggleTorch} title="Flashlight"><Flashlight size={16} /></button>
+                  <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} style={{ width: 40, height: 40 }} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 40, height: 40 }} onClick={() => { setPanel(null); window.dispatchEvent(new CustomEvent('osien-open-battery')); }} title="AOD Studio"><BatteryCharging size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 40, height: 40 }} onClick={() => setPanel('wallpaper')} title="Wallpapers"><ImageIcon size={16} /></button>
+                  <button className={`osien-circle-btn ${autoLockOn ? 'active' : ''}`} style={{ width: 40, height: 40 }} onClick={() => setPanel('locksetup')} title="Gesture Lock"><Lock size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 40, height: 40 }} onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={16} /></button>
+                </div>
+
+                {/* Right Column */}
+                <div className="osien-matrix-col" style={{ opacity: 0.72 }}>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('settings')} title="Settings"><Settings size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => setPanel('drawer')} title="App Drawer"><Search size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={lockPhoneNow} title="Lock Now"><Lock size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => setPanel('wallpaper')} title="Theme"><Sparkles size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('display')} title="Brightness"><Sun size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 38, height: 38 }} onClick={() => openNativePanel('settings')} title="System"><Terminal size={15} /></button>
+                </div>
               </div>
             </div>
           </div>
