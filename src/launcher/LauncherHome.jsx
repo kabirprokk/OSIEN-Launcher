@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useBatteryTelemetry, splitPct } from '../engine/batteryEngine';
 import { MonochromeAppIcon } from './BrandIcons';
+import { WidgetCanvas } from './WidgetCanvas';
 import './launcher.css';
 
 const DEFAULT_GESTURE = ['UP', 'TAP', 'RIGHT', 'LEFT', 'DOWN'];
@@ -568,9 +569,12 @@ export default function LauncherHome() {
       <div className="osien-bg-layer" style={bgStyle} />
       <div className="osien-bg-scrim" />
 
-      {/* Home Stage (scales down smoothly like OxygenOS/iOS when panel/drawer opens) */}
+      {/* Home Stage */}
       <div className={`osien-home-stage ${panel ? 'dimmed' : ''}`}>
-        <HeroAndWidgets onLock={lockPhoneNow} />
+        <WidgetCanvas
+          onLock={lockPhoneNow}
+          onLaunchPkg={(pkg) => launchApp({ packageName: pkg, className: '' })}
+        />
 
         {/* Bottom Floating Diamond Dock */}
         <div className="osien-dock osien-glass">

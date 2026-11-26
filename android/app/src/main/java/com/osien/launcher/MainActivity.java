@@ -65,8 +65,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
         }
 
-        // Expose real Android BatteryManager + AOD controls to WebView
+        // Expose real Android BatteryManager + AOD controls to WebView & force GPU hardware layer
         if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().setLayerType(View.LAYER_TYPE_HARDWARE, null);
             this.bridge.getWebView().addJavascriptInterface(new AndroidBatteryBridge(), "AndroidBattery");
         }
 
@@ -391,6 +392,32 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                     am.setStreamVolume(android.media.AudioManager.STREAM_RING, target, 0);
                 }
             } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public String getAvailableAppWidgets() {
+            try {
+                android.appwidget.AppWidgetManager awm = android.appwidget.AppWidgetManager.getInstance(MainActivity.this);
+                java.util.List<android.appwidget.AppWidgetProviderInfo> list = awm.getInstalledProviders();
+                org.json.JSONArray arr = new org.json.JSONArray();
+                android.content.pm.PackageManager pm = getPackageManager();
+                int count = 0;
+                for (android.appwidget.AppWidgetProviderInfo info : list) {
+                    if (count >= 60) break;
+                    org.json.JSONObject obj = new org.json.JSONObject();
+                    obj.put("provider", info.provider.flattenToString());
+                    obj.put("packageName", info.provider.getPackageName());
+                    String label = info.loadLabel(pm);
+                    obj.put("label", label != null ? label : info.provider.getPackageName());
+                    obj.put("minWidth", info.minWidth);
+                    obj.put("minHeight", info.minHeight);
+                    arr.put(obj);
+                    count++;
+                }
+                return arr.toString();
+            } catch (Exception ignored) {
+                return "[]";
+            }
         }
 
         @JavascriptInterface
