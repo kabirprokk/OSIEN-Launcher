@@ -214,8 +214,9 @@ export default function LauncherHome() {
     try { window.AndroidBattery?.armGestureLockNow?.(); } catch { /* ignore */ }
   };
 
-  // Panels: null | 'control' (Screen 4) | 'matrix' (Screen 5) | 'drawer' (Screen 7) | 'wallpaper'
+  // Panels: null | 'control' | 'more' | 'drawer' | 'wallpaper' | 'locksetup'
   const [panel, setPanel] = useState(null);
+  const [widgetEditing, setWidgetEditing] = useState(false);
   const [query, setQuery] = useState('');
   const [contextApp, setContextApp] = useState(null);
 
@@ -477,15 +478,15 @@ export default function LauncherHome() {
     });
   };
 
-  // iOS / OxygenOS 1:1 Direct-DOM Interactive Swipe-Up (follows finger from pixel 1, ZERO React re-renders!)
+  // iOS / OxygenOS 1:1 Direct-DOM Interactive Swipe-Up (disabled while editing widgets!)
   const onHomeTouchStart = (e) => {
-    if (panel) return;
+    if (panel || widgetEditing) return;
     const t = e.touches[0];
     homeTouchRef.current = { x: t.clientX, y: t.clientY, time: Date.now(), mode: null };
   };
 
   const onHomeTouchMove = (e) => {
-    if (panel || !homeTouchRef.current) return;
+    if (panel || widgetEditing || !homeTouchRef.current) return;
     const t = e.touches[0];
     const dx = t.clientX - homeTouchRef.current.x;
     const dy = t.clientY - homeTouchRef.current.y;
@@ -574,6 +575,7 @@ export default function LauncherHome() {
         <WidgetCanvas
           onLock={lockPhoneNow}
           onLaunchPkg={(pkg) => launchApp({ packageName: pkg, className: '' })}
+          onEditModeChange={setWidgetEditing}
         />
 
         {/* Bottom Floating Diamond Dock */}

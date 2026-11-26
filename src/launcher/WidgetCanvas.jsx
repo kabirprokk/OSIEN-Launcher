@@ -20,9 +20,13 @@ function loadWidgets() {
   return DEFAULT_WIDGETS;
 }
 
-export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchPkg }) {
+export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchPkg, onEditModeChange }) {
   const [widgets, setWidgets] = useState(loadWidgets);
   const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    if (onEditModeChange) onEditModeChange(editMode);
+  }, [editMode, onEditModeChange]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noteText, setNoteText] = useState(() => localStorage.getItem('osien_widget_note') || 'Tap to type a quick note...');
   const [androidWidgets, setAndroidWidgets] = useState([]);
