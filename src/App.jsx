@@ -8,7 +8,7 @@ import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 import LauncherHome from './launcher/LauncherHome';
 
-const APP_VERSION = '0.1.7';
+const APP_VERSION = '0.1.8';
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },

@@ -444,26 +444,31 @@ export default function LauncherHome() {
     });
   };
 
-  // Home Gestures: Swipe Up -> Categorized Drawer, Left Edge -> Control Panel, Right Edge -> Dot Matrix Panel
+  // Instant 0ms Home Gestures: trigger immediately during TouchMove (no waiting for finger lift!)
   const onHomeTouchStart = (e) => {
     if (panel) return;
     const t = e.touches[0];
-    homeTouchRef.current = { x: t.clientX, y: t.clientY };
+    homeTouchRef.current = { x: t.clientX, y: t.clientY, triggered: false };
   };
 
-  const onHomeTouchEnd = (e) => {
-    if (panel || !homeTouchRef.current) return;
-    const t = e.changedTouches[0];
+  const onHomeTouchMove = (e) => {
+    if (panel || !homeTouchRef.current || homeTouchRef.current.triggered) return;
+    const t = e.touches[0];
     const dx = t.clientX - homeTouchRef.current.x;
     const dy = t.clientY - homeTouchRef.current.y;
     const startX = homeTouchRef.current.x;
-    homeTouchRef.current = null;
 
-    if ((startX < 72 && dx > 30) || (startX > window.innerWidth - 72 && dx < -30)) {
+    if ((startX < 72 && dx > 24) || (startX > window.innerWidth - 72 && dx < -24)) {
+      homeTouchRef.current.triggered = true;
       setPanel('control');
-    } else if (dy < -48 && Math.abs(dy) > Math.abs(dx)) {
+    } else if (dy < -28 && Math.abs(dy) > Math.abs(dx)) {
+      homeTouchRef.current.triggered = true;
       setPanel('drawer');
     }
+  };
+
+  const onHomeTouchEnd = () => {
+    homeTouchRef.current = null;
   };
 
   const startLongPress = (app) => {
@@ -500,7 +505,7 @@ export default function LauncherHome() {
   }
 
   return (
-    <div className="osien-home" onTouchStart={onHomeTouchStart} onTouchEnd={onHomeTouchEnd}>
+    <div className="osien-home" onTouchStart={onHomeTouchStart} onTouchMove={onHomeTouchMove} onTouchEnd={onHomeTouchEnd}>
       <div className="osien-bg-layer" style={bgStyle} />
       <div className="osien-bg-scrim" />
 
