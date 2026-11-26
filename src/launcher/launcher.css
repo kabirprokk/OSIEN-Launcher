@@ -362,7 +362,28 @@
   border-color: var(--osien-accent);
 }
 
-/* Screen 7: Categorized Swipe-Up App Drawer */
+/* Screen 7: Pre-Mounted 120fps GPU-Composited App Drawer (0ms open!) */
+.osien-drawer-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 14px calc(var(--safe-bottom) + 14px);
+  background: rgba(2, 4, 10, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.18s ease, visibility 0.18s ease;
+}
+
+.osien-drawer-layer.open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
 .osien-drawer-card {
   width: 100%;
   max-width: 420px;
@@ -371,7 +392,17 @@
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  animation: osien-slide-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  background: rgba(11, 14, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  contain: layout paint;
+  will-change: transform;
+  transform: translate3d(0, 105%, 0);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.osien-drawer-layer.open .osien-drawer-card {
+  transform: translate3d(0, 0, 0);
 }
 
 .osien-cat-header {

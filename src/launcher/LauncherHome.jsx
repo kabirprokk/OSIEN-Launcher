@@ -91,9 +91,84 @@ function categorizeApp(app) {
   return 'UTILITY';
 }
 
+const DiamondTile = React.memo(function DiamondTile({ app, showLabel, onLaunch, onLongStart, onLongCancel, onCtx }) {
+  return (
+    <button
+      className="osien-diamond-btn"
+      onClick={() => onLaunch(app)}
+      onTouchStart={() => onLongStart(app)}
+      onTouchEnd={onLongCancel}
+      onTouchMove={onLongCancel}
+      onContextMenu={(e) => { e.preventDefault(); onCtx(app); }}
+    >
+      <div className="osien-diamond">
+        <span className="osien-diamond-glyph" style={{ display: 'grid', placeItems: 'center' }}>
+          <MonochromeAppIcon app={app} />
+        </span>
+      </div>
+      {showLabel && <span className="osien-app-label">{app.label}</span>}
+    </button>
+  );
+});
+
+/* Isolated 10Hz Battery & 1s Clock Hero — prevents LauncherHome & 100+ App Icons from re-rendering 10x/sec! */
+const HeroAndWidgets = React.memo(function HeroAndWidgets({ onLock }) {
+  const [now, setNow] = useState(() => new Date());
+  const { telemetry } = useBatteryTelemetry({
+    capacityMah: Number(localStorage.getItem('ov_cap') || 5000),
+    enabled: true,
+  });
+  const { whole, dec } = splitPct(telemetry.pct);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase();
+  const dateStr = now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
+
+  return (
+    <div>
+      <div className="osien-hero osien-glass">
+        <div>
+          <div className="osien-clock-time tabular">{timeStr}</div>
+          <div className="osien-clock-date">{dateStr}</div>
+        </div>
+
+        <div className="osien-bat-right" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
+          <div className="tabular" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(248,250,252,0.72)' }}>
+            {whole}.{dec}%
+          </div>
+          <div className="osien-bat-cell">
+            <div className="osien-bat-cap" />
+            <div className="osien-bat-fill" style={{ height: `${Math.max(8, telemetry.pct)}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="osien-widgets-row">
+        <div className="osien-widget-card osien-glass" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'rgba(248,250,252,0.5)' }}>OSIEN POWER</span>
+            <BatteryCharging size={14} color="#34d399" />
+          </div>
+          <div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>
+            {telemetry.chargeState === 'charging' ? `${telemetry.watts.toFixed(1)}W Live` : telemetry.chargeState === 'paused' ? 'Smart Pause' : 'AOD Studio'}
+          </div>
+        </div>
+
+        <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={onLock}>
+          <Lock size={20} color="#38bdf8" />
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'rgba(248,250,252,0.65)' }}>GESTURE LOCK</span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function LauncherHome() {
   const [apps, setApps] = useState(() => loadInstalledApps());
-  const [now, setNow] = useState(() => new Date());
 
   // Screen 1: Real Invisible Gesture Lock (auto-arms on screen off + custom secret sequence)
   const [secretGesture, setSecretGesture] = useState(() => readJson('osien_secret_gesture', DEFAULT_GESTURE));
@@ -229,20 +304,10 @@ export default function LauncherHome() {
     ? { transform: `translate3d(0, ${sheetDragY}px, 0)`, transition: 'none' }
     : { transform: 'translate3d(0, 0, 0)', transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)' };
 
-  const { telemetry } = useBatteryTelemetry({
-    capacityMah: Number(localStorage.getItem('ov_cap') || 5000),
-    enabled: true,
-  });
-  const { whole, dec } = splitPct(telemetry.pct);
-
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
     const onFocus = () => setApps(loadInstalledApps());
     window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener('focus', onFocus);
-    };
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const effectiveDock = useMemo(() => {
@@ -410,24 +475,16 @@ export default function LauncherHome() {
   const activeWall = WALLPAPERS.find((w) => w.id === wallId) || WALLPAPERS[0];
   const bgStyle = wallId === 'custom' && customWall ? { backgroundImage: `url(${customWall})` } : { background: activeWall.css };
 
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase();
-  const dateStr = now.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase();
-
   const renderDiamond = (app, showLabel = false) => (
-    <button
+    <DiamondTile
       key={app.packageName}
-      className="osien-diamond-btn"
-      onClick={() => launchApp(app)}
-      onTouchStart={() => startLongPress(app)}
-      onTouchEnd={cancelLongPress}
-      onTouchMove={cancelLongPress}
-      onContextMenu={(e) => { e.preventDefault(); setContextApp(app); }}
-    >
-      <div className="osien-diamond">
-        <AppDiamondIcon app={app} />
-      </div>
-      {showLabel && <span className="osien-app-label">{app.label}</span>}
-    </button>
+      app={app}
+      showLabel={showLabel}
+      onLaunch={launchApp}
+      onLongStart={startLongPress}
+      onLongCancel={cancelLongPress}
+      onCtx={setContextApp}
+    />
   );
 
   // Screen 1: Totally Blank Invisible Gesture Lock
@@ -449,42 +506,7 @@ export default function LauncherHome() {
 
       {/* Home Stage (scales down smoothly like OxygenOS/iOS when panel/drawer opens) */}
       <div className={`osien-home-stage ${panel ? 'dimmed' : ''}`}>
-        <div>
-          <div className="osien-hero osien-glass">
-            <div>
-              <div className="osien-clock-time tabular">{timeStr}</div>
-              <div className="osien-clock-date">{dateStr}</div>
-            </div>
-
-            <div className="osien-bat-right" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
-              <div className="tabular" style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'rgba(248,250,252,0.72)' }}>
-                {whole}.{dec}%
-              </div>
-              <div className="osien-bat-cell">
-                <div className="osien-bat-cap" />
-                <div className="osien-bat-fill" style={{ height: `${Math.max(8, telemetry.pct)}%` }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Widget 1 + Compact Square Widget */}
-          <div className="osien-widgets-row">
-            <div className="osien-widget-card osien-glass" onClick={() => window.dispatchEvent(new CustomEvent('osien-open-battery'))}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 10, letterSpacing: '0.14em', color: 'rgba(248,250,252,0.5)' }}>OSIEN POWER</span>
-                <BatteryCharging size={14} color="#34d399" />
-              </div>
-              <div className="tabular" style={{ fontSize: 15, fontWeight: 500 }}>
-                {telemetry.chargeState === 'charging' ? `${telemetry.watts.toFixed(1)}W Live` : telemetry.chargeState === 'paused' ? 'Smart Pause' : 'AOD Studio'}
-              </div>
-            </div>
-
-            <div className="osien-widget-card osien-glass" style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={lockPhoneNow}>
-              <Lock size={20} color="#38bdf8" />
-              <span style={{ fontSize: 10, letterSpacing: '0.12em', color: 'rgba(248,250,252,0.65)' }}>GESTURE LOCK</span>
-            </div>
-          </div>
-        </div>
+        <HeroAndWidgets onLock={lockPhoneNow} />
 
         {/* Bottom Floating Diamond Dock */}
         <div className="osien-dock osien-glass">
@@ -572,65 +594,66 @@ export default function LauncherHome() {
         </div>
       )}
 
-      {/* FIXED SWIPE-UP CATEGORIZED DIAMOND APP DRAWER */}
-      {panel === 'drawer' && (
-        <div className="osien-bottom-card-backdrop" onClick={() => { setPanel(null); setQuery(''); }}>
-          <div
-            className="osien-drawer-card osien-glass"
-            style={sheetDragStyle}
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => onSheetTouchStart(e, true)}
-            onTouchMove={onSheetTouchMove}
-            onTouchEnd={onSheetTouchEnd}
-          >
-            <div className="sheet-handle" style={{ marginBottom: 12 }} />
-            <div className="osien-search-bar" style={{ marginBottom: 8 }}>
-              <Search size={16} color="#a78bfa" />
-              <input
-                type="search"
-                className="osien-search-input"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search apps..."
-                autoComplete="off"
-                autoCorrect="off"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery('')}
-                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </div>
+      {/* PRE-MOUNTED 120FPS GPU-COMPOSITED SWIPE-UP DIAMOND APP DRAWER (0ms open!) */}
+      <div
+        className={`osien-drawer-layer ${panel === 'drawer' ? 'open' : ''}`}
+        onClick={() => { setPanel(null); setQuery(''); }}
+      >
+        <div
+          className="osien-drawer-card"
+          style={panel === 'drawer' && sheetDragY > 0 ? { transform: `translate3d(0, ${sheetDragY}px, 0)`, transition: 'none' } : undefined}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => onSheetTouchStart(e, true)}
+          onTouchMove={onSheetTouchMove}
+          onTouchEnd={onSheetTouchEnd}
+        >
+          <div className="sheet-handle" style={{ marginBottom: 12 }} />
+          <div className="osien-search-bar" style={{ marginBottom: 8 }}>
+            <Search size={16} color="#a78bfa" />
+            <input
+              type="search"
+              className="osien-search-input"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search apps..."
+              autoComplete="off"
+              autoCorrect="off"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
 
-            <div className="osien-drawer-scroll" ref={drawerScrollRef}>
-              {query.trim() ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px 4px', paddingTop: 8 }}>
-                  {apps
-                    .filter((a) => `${a.label || ''} ${a.packageName || ''}`.toLowerCase().includes(query.trim().toLowerCase()))
-                    .map((app) => renderDiamond(app, true))}
-                </div>
-              ) : (
-                (['SOCIAL', 'GAMES', 'UTILITY']).map((cat) =>
-                  categorized[cat].length > 0 ? (
-                    <div key={cat}>
-                      <div className="osien-cat-header">
-                        <span className="osien-cat-line" />
-                        <span>{cat}</span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px 4px' }}>
-                        {categorized[cat].map((app) => renderDiamond(app, true))}
-                      </div>
+          <div className="osien-drawer-scroll" ref={drawerScrollRef}>
+            {query.trim() ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px 4px', paddingTop: 8 }}>
+                {apps
+                  .filter((a) => `${a.label || ''} ${a.packageName || ''}`.toLowerCase().includes(query.trim().toLowerCase()))
+                  .map((app) => renderDiamond(app, true))}
+              </div>
+            ) : (
+              (['SOCIAL', 'GAMES', 'UTILITY']).map((cat) =>
+                categorized[cat].length > 0 ? (
+                  <div key={cat}>
+                    <div className="osien-cat-header">
+                      <span className="osien-cat-line" />
+                      <span>{cat}</span>
                     </div>
-                  ) : null
-                )
-              )}
-            </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px 4px' }}>
+                      {categorized[cat].map((app) => renderDiamond(app, true))}
+                    </div>
+                  </div>
+                ) : null
+              )
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* 3-DOT EXPANDED QUICK TOOLS MATRIX (Matches Image 2) */}
       {panel === 'more' && (
