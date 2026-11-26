@@ -263,25 +263,54 @@ export default function LauncherHome() {
   const homeTouchRef = useRef(null);
   const longPressTimer = useRef(null);
   const drawerScrollRef = useRef(null);
+  const drawerLayerRef = useRef(null);
+  const drawerCardRef = useRef(null);
   const sheetSwipeRef = useRef(null);
   const [sheetDragY, setSheetDragY] = useState(0);
 
-  const onSheetTouchStart = (e, checkScroll = false) => {
+  // Direct-DOM 1:1 finger tracking for App Drawer dismiss (ZERO React re-renders during drag!)
+  const onDrawerTouchStart = (e) => {
     e.stopPropagation();
-    if (checkScroll && drawerScrollRef.current && drawerScrollRef.current.scrollTop > 4) {
+    if (drawerScrollRef.current && drawerScrollRef.current.scrollTop > 4) {
       sheetSwipeRef.current = null;
       return;
     }
-    const t = e.touches[0];
-    sheetSwipeRef.current = { y: t.clientY, time: Date.now() };
+    sheetSwipeRef.current = { y: e.touches[0].clientY, time: Date.now() };
+    if (drawerCardRef.current) drawerCardRef.current.style.transition = 'none';
+  };
+
+  const onDrawerTouchMove = (e) => {
+    if (!sheetSwipeRef.current || !drawerCardRef.current) return;
+    const dy = e.touches[0].clientY - sheetSwipeRef.current.y;
+    if (dy > 0) {
+      drawerCardRef.current.style.transform = `translate3d(0, ${dy}px, 0)`;
+    }
+  };
+
+  const onDrawerTouchEnd = (e) => {
+    e.stopPropagation();
+    if (!sheetSwipeRef.current || !drawerCardRef.current) return;
+    const dy = e.changedTouches[0].clientY - sheetSwipeRef.current.y;
+    const dt = Math.max(1, Date.now() - sheetSwipeRef.current.time);
+    const velocity = dy / dt;
+    sheetSwipeRef.current = null;
+    drawerCardRef.current.style.transition = '';
+    drawerCardRef.current.style.transform = '';
+    if (dy > 75 || velocity > 0.38) {
+      setPanel(null);
+      setQuery('');
+    }
+  };
+
+  const onSheetTouchStart = (e) => {
+    e.stopPropagation();
+    sheetSwipeRef.current = { y: e.touches[0].clientY, time: Date.now() };
   };
 
   const onSheetTouchMove = (e) => {
     if (!sheetSwipeRef.current) return;
     const dy = e.touches[0].clientY - sheetSwipeRef.current.y;
-    if (dy > 0) {
-      setSheetDragY(dy);
-    }
+    if (dy > 0) setSheetDragY(dy);
   };
 
   const onSheetTouchEnd = (e) => {
@@ -291,12 +320,10 @@ export default function LauncherHome() {
     const dt = Math.max(1, Date.now() - sheetSwipeRef.current.time);
     const velocity = dy / dt;
     sheetSwipeRef.current = null;
+    setSheetDragY(0);
     if (dy > 72 || velocity > 0.42) {
-      setSheetDragY(0);
       setPanel(null);
       setQuery('');
-    } else {
-      setSheetDragY(0);
     }
   };
 
@@ -444,31 +471,58 @@ export default function LauncherHome() {
     });
   };
 
-  // Instant 0ms Home Gestures: trigger immediately during TouchMove (no waiting for finger lift!)
+  // iOS / OxygenOS 1:1 Direct-DOM Interactive Swipe-Up (follows finger from pixel 1, ZERO React re-renders!)
   const onHomeTouchStart = (e) => {
     if (panel) return;
     const t = e.touches[0];
-    homeTouchRef.current = { x: t.clientX, y: t.clientY, triggered: false };
+    homeTouchRef.current = { x: t.clientX, y: t.clientY, time: Date.now(), mode: null };
   };
 
   const onHomeTouchMove = (e) => {
-    if (panel || !homeTouchRef.current || homeTouchRef.current.triggered) return;
+    if (panel || !homeTouchRef.current) return;
     const t = e.touches[0];
     const dx = t.clientX - homeTouchRef.current.x;
     const dy = t.clientY - homeTouchRef.current.y;
     const startX = homeTouchRef.current.x;
 
-    if ((startX < 72 && dx > 24) || (startX > window.innerWidth - 72 && dx < -24)) {
-      homeTouchRef.current.triggered = true;
-      setPanel('control');
-    } else if (dy < -28 && Math.abs(dy) > Math.abs(dx)) {
-      homeTouchRef.current.triggered = true;
-      setPanel('drawer');
+    if (!homeTouchRef.current.mode) {
+      if ((startX < 72 && dx > 22) || (startX > window.innerWidth - 72 && dx < -22)) {
+        homeTouchRef.current.mode = 'control';
+        setPanel('control');
+        return;
+      }
+      if (dy < -10 && Math.abs(dy) > Math.abs(dx)) {
+        homeTouchRef.current.mode = 'drawer';
+        if (drawerCardRef.current) drawerCardRef.current.style.transition = 'none';
+        if (drawerLayerRef.current) drawerLayerRef.current.style.transition = 'none';
+      }
+    }
+
+    if (homeTouchRef.current.mode === 'drawer' && drawerCardRef.current && drawerLayerRef.current) {
+      const drawerH = window.innerHeight * 0.78;
+      const offsetY = Math.max(0, drawerH + dy);
+      const progress = Math.max(0, Math.min(1, 1 - offsetY / drawerH));
+      drawerCardRef.current.style.transform = `translate3d(0, ${offsetY}px, 0)`;
+      drawerLayerRef.current.style.opacity = String(progress);
     }
   };
 
-  const onHomeTouchEnd = () => {
+  const onHomeTouchEnd = (e) => {
+    if (!homeTouchRef.current) return;
+    const ref = homeTouchRef.current;
     homeTouchRef.current = null;
+    if (ref.mode === 'drawer' && drawerCardRef.current && drawerLayerRef.current) {
+      const dy = e.changedTouches[0].clientY - ref.y;
+      const dt = Math.max(1, Date.now() - ref.time);
+      const velocity = dy / dt;
+      drawerCardRef.current.style.transition = '';
+      drawerCardRef.current.style.transform = '';
+      drawerLayerRef.current.style.transition = '';
+      drawerLayerRef.current.style.opacity = '';
+      if (dy < -70 || velocity < -0.32) {
+        setPanel('drawer');
+      }
+    }
   };
 
   const startLongPress = (app) => {
@@ -554,21 +608,21 @@ export default function LauncherHome() {
               <Sun size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: brightness > 15 ? '#020617' : '#f8fafc', pointerEvents: 'none' }} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
-              {/* Col 1: Wi-Fi, Direct Bluetooth, Settings (3 stacked 50px circles) */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 174 }}>
-                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={19} /></button>
-                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={19} /></button>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={19} /></button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              {/* Col 1: Wi-Fi, Direct Bluetooth, Settings */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 158 }}>
+                <button className="osien-circle-btn active" onClick={() => openNativePanel('internet')} title="Wi-Fi"><Wifi size={17} /></button>
+                <button className={`osien-circle-btn ${btOn ? 'active' : ''}`} onClick={toggleBtDirect} title="Bluetooth"><Bluetooth size={17} /></button>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('settings')} title="Settings"><Settings size={17} /></button>
               </div>
 
-              {/* Col 2: Globe (50px circle) + Vertical Pill (Airplane, Hotspot, 3-Dots) */}
-              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', height: 174 }}>
-                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={19} /></button>
+              {/* Col 2: Globe + Vertical Pill (Airplane, Hotspot, 3-Dots) */}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', height: 158 }}>
+                <button className="osien-circle-btn" onClick={() => openNativePanel('internet')} title="Mobile Data"><Globe size={17} /></button>
                 <div className="osien-pill-stack">
-                  <button className="osien-circle-btn" style={{ width: 34, height: 34, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={17} /></button>
-                  <button className="osien-circle-btn" style={{ width: 34, height: 34, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={17} /></button>
-                  <button className="osien-circle-btn" style={{ width: 30, height: 30 }} onClick={() => setPanel('more')} title="More Tools"><MoreHorizontal size={16} /></button>
+                  <button className="osien-circle-btn" style={{ width: 30, height: 30, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('airplane')} title="Airplane"><Plane size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 30, height: 30, border: 'none', background: 'transparent' }} onClick={() => openNativePanel('hotspot')} title="Hotspot"><Radio size={15} /></button>
+                  <button className="osien-circle-btn" style={{ width: 28, height: 28 }} onClick={() => setPanel('more')} title="More Tools"><MoreHorizontal size={15} /></button>
                 </div>
               </div>
 
@@ -597,18 +651,19 @@ export default function LauncherHome() {
         </div>
       )}
 
-      {/* PRE-MOUNTED 120FPS GPU-COMPOSITED SWIPE-UP DIAMOND APP DRAWER (0ms open!) */}
+      {/* PRE-MOUNTED 120FPS 1:1 DIRECT-DOM SWIPE-UP DIAMOND APP DRAWER */}
       <div
+        ref={drawerLayerRef}
         className={`osien-drawer-layer ${panel === 'drawer' ? 'open' : ''}`}
         onClick={() => { setPanel(null); setQuery(''); }}
       >
         <div
+          ref={drawerCardRef}
           className="osien-drawer-card"
-          style={panel === 'drawer' && sheetDragY > 0 ? { transform: `translate3d(0, ${sheetDragY}px, 0)`, transition: 'none' } : undefined}
           onClick={(e) => e.stopPropagation()}
-          onTouchStart={(e) => onSheetTouchStart(e, true)}
-          onTouchMove={onSheetTouchMove}
-          onTouchEnd={onSheetTouchEnd}
+          onTouchStart={onDrawerTouchStart}
+          onTouchMove={onDrawerTouchMove}
+          onTouchEnd={onDrawerTouchEnd}
         >
           <div className="sheet-handle" style={{ marginBottom: 12 }} />
           <div className="osien-search-bar" style={{ marginBottom: 8 }}>
