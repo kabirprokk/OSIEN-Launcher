@@ -304,6 +304,11 @@ export default function LauncherHome() {
 
   const onSheetTouchStart = (e) => {
     e.stopPropagation();
+    // Ignore touch drags started on sliders, buttons, or inputs — only drag from empty panel space!
+    if (e.target && e.target.closest && e.target.closest('.osien-hslider-wrap, .osien-vslider-wrap, button, input')) {
+      sheetSwipeRef.current = null;
+      return;
+    }
     sheetSwipeRef.current = { y: e.touches[0].clientY, time: Date.now() };
   };
 
