@@ -492,15 +492,32 @@
   position: absolute;
   box-sizing: border-box;
   contain: layout style;
-  will-change: left, top, width, height;
+  will-change: left, top, width, height, transform;
+  transition: left 0.22s cubic-bezier(0.22, 1.15, 0.36, 1), top 0.22s cubic-bezier(0.22, 1.15, 0.36, 1), transform 0.2s cubic-bezier(0.22, 1.2, 0.36, 1);
 }
 
-.osien-free-widget.editing {
-  outline: 1.5px dashed rgba(56, 189, 248, 0.8);
+.osien-free-widget.dragging {
+  transition: none;
+  z-index: 40;
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.65));
+}
+
+.osien-free-widget.editing:not(.dragging) {
+  outline: 1.5px dashed rgba(56, 189, 248, 0.72);
   outline-offset: 3px;
   border-radius: 24px;
   z-index: 30;
   touch-action: none;
+  animation: osien-wiggle 0.32s ease-in-out infinite alternate;
+}
+
+.osien-free-widget.editing:nth-child(even):not(.dragging) {
+  animation-delay: -0.16s;
+}
+
+@keyframes osien-wiggle {
+  from { transform: rotate(-0.95deg) scale(0.995); }
+  to { transform: rotate(0.95deg) scale(1.005); }
 }
 
 .osien-w-del {

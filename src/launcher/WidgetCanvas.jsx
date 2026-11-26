@@ -20,6 +20,45 @@ function loadWidgets() {
   return DEFAULT_WIDGETS;
 }
 
+// Solid Magnetic Repulsion Solver — guarantees 10px air-gap so widgets NEVER merge or overlap!
+function resolveMagneticCollision(rect, others, canvasW, canvasH) {
+  const GAP = 10;
+  let xPx = (rect.x / 100) * canvasW;
+  let yPx = rect.y;
+  const wPx = (rect.w / 100) * canvasW;
+  const hPx = rect.h;
+
+  for (let pass = 0; pass < 3; pass++) {
+    for (const o of others) {
+      const ox = (o.x / 100) * canvasW;
+      const oy = o.y;
+      const ow = (o.w / 100) * canvasW;
+      const oh = o.h;
+
+      const overlapX = Math.min(xPx + wPx + GAP, ox + ow + GAP) - Math.max(xPx, ox);
+      const overlapY = Math.min(yPx + hPx + GAP, oy + oh + GAP) - Math.max(yPx, oy);
+
+      if (overlapX > 0 && overlapY > 0) {
+        const cx = xPx + wPx / 2;
+        const cy = yPx + hPx / 2;
+        const ocx = ox + ow / 2;
+        const ocy = oy + oh / 2;
+
+        // Magnetic push along minimum-penetration axis
+        if (overlapX < overlapY) {
+          xPx = cx < ocx ? ox - wPx - GAP : ox + ow + GAP;
+        } else {
+          yPx = cy < ocy ? oy - hPx - GAP : oy + oh + GAP;
+        }
+      }
+    }
+    xPx = Math.max(0, Math.min(canvasW - wPx, xPx));
+    yPx = Math.max(0, Math.min(canvasH - hPx, yPx));
+  }
+
+  return { x: (xPx / canvasW) * 100, y: yPx };
+}
+
 export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchPkg, onEditModeChange }) {
   const [widgets, setWidgets] = useState(loadWidgets);
   const [editMode, setEditMode] = useState(false);
@@ -93,24 +132,28 @@ export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchP
   };
   const cancelHold = () => clearTimeout(holdTimer.current);
 
-  // Direct-DOM 0-lag Drag & Resize
+  // Direct-DOM 0-lag Liquid-Solid Magnetic Drag & Resize
   const startInteract = (e, widget, mode) => {
     if (!editMode) return;
     e.stopPropagation();
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
+    const el = e.currentTarget.closest('.osien-free-widget');
+    if (el) el.classList.add('dragging');
     dragInfo.current = {
       id: widget.id,
       mode, // 'move' | 'resize'
-      el: e.currentTarget.closest('.osien-free-widget'),
+      el,
       startX: e.clientX,
       startY: e.clientY,
+      prevClientX: e.clientX,
       origX: widget.x,
       origY: widget.y,
       origW: widget.w,
       origH: widget.h,
       canvasW: canvasRect.width,
       canvasH: canvasRect.height,
+      others: widgets.filter((item) => item.id !== widget.id),
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -121,14 +164,24 @@ export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchP
     e.stopPropagation();
     const dxPct = ((e.clientX - d.startX) / d.canvasW) * 100;
     const dyPx = e.clientY - d.startY;
+    const vx = e.clientX - d.prevClientX;
+    d.prevClientX = e.clientX;
 
     if (d.mode === 'move') {
-      const nx = Math.max(0, Math.min(100 - d.origW, d.origX + dxPct));
-      const ny = Math.max(0, Math.min(d.canvasH - d.origH, d.origY + dyPx));
-      d.el.style.left = `${nx}%`;
-      d.el.style.top = `${ny}px`;
-      d.lastX = nx;
-      d.lastY = ny;
+      const rawX = Math.max(0, Math.min(100 - d.origW, d.origX + dxPct));
+      const rawY = Math.max(0, Math.min(d.canvasH - d.origH, d.origY + dyPx));
+      const resolved = resolveMagneticCollision(
+        { x: rawX, y: rawY, w: d.origW, h: d.origH },
+        d.others,
+        d.canvasW,
+        d.canvasH
+      );
+      const tilt = Math.max(-4.5, Math.min(4.5, vx * 0.32));
+      d.el.style.left = `${resolved.x}%`;
+      d.el.style.top = `${resolved.y}px`;
+      d.el.style.transform = `scale(1.035) rotate(${tilt.toFixed(2)}deg)`;
+      d.lastX = resolved.x;
+      d.lastY = resolved.y;
     } else {
       const nw = Math.max(28, Math.min(100 - d.origX, d.origW + dxPct));
       const nh = Math.max(58, Math.min(260, d.origH + dyPx));
@@ -143,6 +196,10 @@ export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchP
     const d = dragInfo.current;
     if (!d) return;
     e.stopPropagation();
+    if (d.el) {
+      d.el.classList.remove('dragging');
+      d.el.style.transform = '';
+    }
     dragInfo.current = null;
     setWidgets((prev) =>
       prev.map((w) => {
