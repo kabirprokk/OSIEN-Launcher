@@ -41,6 +41,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     private SensorManager sensorManager;
     private Sensor proximitySensor;
+    private BatteryManager cachedBatteryManager;
+    private final android.os.Handler aodTimeoutHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private Runnable aodTimeoutRunnable;
     private boolean isInPocket = false;
     private float userBrightness = -1f; // -1 = system default
     private boolean launchedFromAod = false;
@@ -60,6 +63,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         configureWindowForMode();
 
         // Proximity sensor for Pocket Mode (turns display black when in pocket/bag)
+        cachedBatteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         if (sensorManager != null) {
             proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
@@ -101,6 +105,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
 
     @Override
     public void onDestroy() {
+        cancelAodTimeout();
         super.onDestroy();
         if (unlockReceiver != null) {
             try {
@@ -155,7 +160,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
             enterImmersiveMode();
+            scheduleAodTimeout();
         } else {
+            cancelAodTimeout();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 setShowWhenLocked(false);
                 setTurnScreenOn(false);
@@ -164,6 +171,48 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
             showSystemBars();
+        }
+    }
+
+    private void scheduleAodTimeout() {
+        cancelAodTimeout();
+        if (!launchedFromAod) return;
+        SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+        int timeoutSec = prefs.getInt("aod_timeout_sec", 15); // Default 15s for massive battery savings
+        if (timeoutSec <= 0) return; // 0 = Always On
+
+        aodTimeoutRunnable = () -> {
+            if (!launchedFromAod) return;
+            // Prevent ChargingMonitorService from immediately re-waking AOD when screen turns off
+            prefs.edit().putLong("aod_sleep_until_ms", System.currentTimeMillis() + 60000L).apply();
+            launchedFromAod = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(false);
+                setTurnScreenOn(false);
+            }
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+            WindowManager.LayoutParams lp = getWindow().getAttributes();
+            lp.screenBrightness = -1f;
+            getWindow().setAttributes(lp);
+            moveTaskToBack(true);
+        };
+        aodTimeoutHandler.postDelayed(aodTimeoutRunnable, timeoutSec * 1000L);
+    }
+
+    private void cancelAodTimeout() {
+        if (aodTimeoutRunnable != null) {
+            aodTimeoutHandler.removeCallbacks(aodTimeoutRunnable);
+            aodTimeoutRunnable = null;
+        }
+    }
+
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        if (launchedFromAod) {
+            scheduleAodTimeout();
         }
     }
 
@@ -187,6 +236,7 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
     @Override
     public void onPause() {
         super.onPause();
+        cancelAodTimeout();
         if (sensorManager != null) {
             sensorManager.unregisterListener(this);
         }
@@ -676,6 +726,15 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
         }
 
         @JavascriptInterface
+        public void setAodTimeout(int seconds) {
+            SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().putInt("aod_timeout_sec", Math.max(0, seconds)).apply();
+            runOnUiThread(() -> {
+                if (launchedFromAod) scheduleAodTimeout();
+            });
+        }
+
+        @JavascriptInterface
         public void setPopupConfig(boolean enabled, String style, int delayMs, String accentHex) {
             SharedPreferences prefs = getSharedPreferences(ChargingMonitorService.PREFS_NAME, MODE_PRIVATE);
             prefs.edit()
@@ -787,7 +846,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
             try {
                 IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
                 Intent batteryStatus = registerReceiver(null, filter);
-                BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE);
+                BatteryManager bm = cachedBatteryManager != null
+                    ? cachedBatteryManager
+                    : (BatteryManager) getSystemService(BATTERY_SERVICE);
 
                 int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1;
                 int scale = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, 100) : 100;

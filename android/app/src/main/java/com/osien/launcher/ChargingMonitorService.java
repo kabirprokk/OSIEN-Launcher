@@ -70,9 +70,17 @@ public class ChargingMonitorService extends Service {
                     if (gestureLock) {
                         prefs.edit().putBoolean("gesture_lock_armed", true).apply();
                     }
+                    // Guard: if AOD just timed out and put the screen to sleep, DO NOT re-wake in an infinite loop!
+                    long sleepUntilMs = prefs.getLong("aod_sleep_until_ms", 0L);
+                    if (System.currentTimeMillis() < sleepUntilMs) {
+                        return;
+                    }
                     if (aodEnabled && (!chargingOnly || isDeviceCharging(context))) {
                         mainHandler.postDelayed(() -> wakeAndLaunchAod(context), 320);
                     }
+                } else if (Intent.ACTION_USER_PRESENT.equals(action)) {
+                    // User actively unlocked device: clear AOD sleep guard so next lock shows AOD normally
+                    prefs.edit().putLong("aod_sleep_until_ms", 0L).apply();
                 }
             }
         };
@@ -81,6 +89,7 @@ public class ChargingMonitorService extends Service {
         filter.addAction(Intent.ACTION_POWER_CONNECTED);
         filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(screenAndPowerReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -265,7 +274,7 @@ public class ChargingMonitorService extends Service {
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
                     "OsienLauncher:AodWakeLock"
                 );
-                wl.acquire(4000);
+                wl.acquire(1500);
             }
         } catch (Exception ignored) {}
 

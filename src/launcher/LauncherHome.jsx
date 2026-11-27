@@ -122,8 +122,17 @@ const HeroAndWidgets = React.memo(function HeroAndWidgets({ onLock }) {
   const { whole, dec } = splitPct(telemetry.pct);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const syncClock = () => {
+      if (document.hidden) return;
+      const d = new Date();
+      setNow((prev) => (prev.getMinutes() === d.getMinutes() && prev.getHours() === d.getHours() ? prev : d));
+    };
+    const id = setInterval(syncClock, 10000);
+    document.addEventListener('visibilitychange', syncClock);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', syncClock);
+    };
   }, []);
 
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(' ', '').toLowerCase();

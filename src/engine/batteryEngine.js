@@ -41,6 +41,9 @@ const INITIAL_TELEMETRY = {
 const engine = {
   subscribers: new Set(),
   timer: null,
+  lastTickAt: Date.now(),
+  visibilityBound: false,
+  lastNotifiedKey: '',
   capacityMah: Number(typeof localStorage !== 'undefined' ? localStorage.getItem('ov_cap') || 5000 : 5000),
   hardwareSupported: false,
   telemetry: INITIAL_TELEMETRY,
@@ -74,8 +77,12 @@ const engine = {
 };
 
 function notifySubscribers() {
+  const t = engine.telemetry;
+  const key = `${t.pct.toFixed(3)}|${t.chargeState}|${t.watts.toFixed(1)}|${t.iBatMa}|${t.etaSeconds}|${engine.hardwareSupported}`;
+  if (key === engine.lastNotifiedKey) return;
+  engine.lastNotifiedKey = key;
   for (const cb of engine.subscribers) {
-    cb(engine.telemetry, engine.hardwareSupported);
+    cb(t, engine.hardwareSupported);
   }
 }
 
@@ -112,9 +119,9 @@ function initWebBatteryFallback() {
 }
 
 function tickEngine() {
-  const TICK_MS = 100;
-  const DT_SEC = TICK_MS / 1000;
   const now = Date.now();
+  const DT_SEC = Math.max(0.05, Math.min(5.0, (now - engine.lastTickAt) / 1000));
+  engine.lastTickAt = now;
 
   let nativeData = null;
   if (typeof window !== 'undefined' && window.AndroidBattery && typeof window.AndroidBattery.getTelemetry === 'function') {
@@ -431,17 +438,61 @@ function tickEngine() {
   }
 }
 
+function getAdaptiveDelayMs() {
+  if (typeof document !== 'undefined' && document.hidden) return null; // 0 Hz when screen off or app in background!
+  const st = engine.telemetry.chargeState;
+  if (st === 'charging') return 250; // 4 Hz smooth 3-decimal updates while plugged in
+  if (st === 'paused' || st === 'full') return 5000; // 0.2 Hz when full/paused
+  return 3000; // 0.33 Hz on battery (97% less CPU & JNI drain!)
+}
+
+function scheduleNextTick() {
+  if (engine.timer) {
+    clearTimeout(engine.timer);
+    engine.timer = null;
+  }
+  if (engine.subscribers.size === 0) return;
+  const delay = getAdaptiveDelayMs();
+  if (delay === null) return; // Completely asleep while hidden
+  engine.timer = setTimeout(() => {
+    engine.timer = null;
+    if (engine.subscribers.size === 0) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    tickEngine();
+    scheduleNextTick();
+  }, delay);
+}
+
+function bindVisibilityListener() {
+  if (engine.visibilityBound || typeof document === 'undefined') return;
+  engine.visibilityBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (engine.timer) {
+        clearTimeout(engine.timer);
+        engine.timer = null;
+      }
+    } else if (engine.subscribers.size > 0) {
+      engine.lastTickAt = Date.now();
+      tickEngine();
+      scheduleNextTick();
+    }
+  });
+}
+
 function startEngineIfNeeded() {
   initWebBatteryFallback();
-  if (!engine.timer) {
+  bindVisibilityListener();
+  if (!engine.timer && (typeof document === 'undefined' || !document.hidden)) {
+    engine.lastTickAt = Date.now();
     tickEngine();
-    engine.timer = setInterval(tickEngine, 100);
+    scheduleNextTick();
   }
 }
 
 function stopEngineIfUnused() {
   if (engine.subscribers.size === 0 && engine.timer) {
-    clearInterval(engine.timer);
+    clearTimeout(engine.timer);
     engine.timer = null;
   }
 }

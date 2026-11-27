@@ -43,8 +43,17 @@ export const WidgetCanvas = React.memo(function WidgetCanvas({ onLock, onLaunchP
   const dragInfo = useRef(null);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const syncClock = () => {
+      if (document.hidden) return;
+      const d = new Date();
+      setNow((prev) => (prev.getMinutes() === d.getMinutes() && prev.getHours() === d.getHours() ? prev : d));
+    };
+    const id = setInterval(syncClock, 10000);
+    document.addEventListener('visibilitychange', syncClock);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', syncClock);
+    };
   }, []);
 
   useEffect(() => {

@@ -8,7 +8,15 @@ import { TEMPLATES, ACCENT_COLORS, FONT_PRESETS } from './templates';
 import { CLOCK_STYLES, BG_PRESETS, ClockWidget } from './components/ClockWidgets';
 import LauncherHome from './launcher/LauncherHome';
 
-const APP_VERSION = '0.2.6';
+const APP_VERSION = '0.2.7';
+const AOD_TIMEOUT_OPTIONS = [
+  { sec: 5, label: '5s' },
+  { sec: 10, label: '10s' },
+  { sec: 15, label: '15s' },
+  { sec: 30, label: '30s' },
+  { sec: 60, label: '60s' },
+  { sec: 0, label: 'Always' },
+];
 const POPUP_STYLES = [
   { id: 'island', label: 'Dynamic Island' },
   { id: 'edge', label: 'Edge Glow' },
@@ -88,7 +96,11 @@ function BatteryApp({ onExitHome }) {
   const [capacityMah, setCapacityMah] = useState(() => Number(localStorage.getItem('ov_cap') || 5000));
   const [aodEnabled, setAodEnabled] = useState(() => localStorage.getItem('ov_aod_on') !== 'false');
   const [aodChargingOnly, setAodChargingOnly] = useState(() => localStorage.getItem('ov_aod_chg') === 'true');
-  const [aodBrightness, setAodBrightness] = useState(() => Number(localStorage.getItem('ov_bright') || 35));
+  const [aodTimeoutSec, setAodTimeoutSec] = useState(() => {
+    const saved = localStorage.getItem('ov_aod_timeout');
+    return saved !== null ? Number(saved) : 15;
+  });
+  const [aodBrightness, setAodBrightness] = useState(() => Number(localStorage.getItem('ov_bright') || 20));
   const [popupEnabled, setPopupEnabled] = useState(() => localStorage.getItem('ov_pop_on') !== 'false');
   const [popupStyle, setPopupStyle] = useState(() => localStorage.getItem('ov_pop_style') || 'island');
   const [popupDelayMs, setPopupDelayMs] = useState(() => Number(localStorage.getItem('ov_pop_delay') ?? 2800));
@@ -199,6 +211,7 @@ function BatteryApp({ onExitHome }) {
     localStorage.setItem('ov_cap', String(capacityMah));
     localStorage.setItem('ov_aod_on', String(aodEnabled));
     localStorage.setItem('ov_aod_chg', String(aodChargingOnly));
+    localStorage.setItem('ov_aod_timeout', String(aodTimeoutSec));
     localStorage.setItem('ov_bright', String(aodBrightness));
     localStorage.setItem('ov_pop_on', String(popupEnabled));
     localStorage.setItem('ov_pop_style', popupStyle);
@@ -207,6 +220,9 @@ function BatteryApp({ onExitHome }) {
     if (typeof window !== 'undefined' && window.AndroidBattery) {
       try {
         window.AndroidBattery.setAodConfig(aodEnabled, aodChargingOnly);
+        if (window.AndroidBattery.setAodTimeout) {
+          window.AndroidBattery.setAodTimeout(aodTimeoutSec);
+        }
         window.AndroidBattery.setAodBrightness(Math.max(0.03, aodBrightness / 100));
         if (window.AndroidBattery.setPopupConfig) {
           window.AndroidBattery.setPopupConfig(popupEnabled, popupStyle, popupDelayMs, accent);
@@ -215,11 +231,20 @@ function BatteryApp({ onExitHome }) {
         // Ignore
       }
     }
-  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, capacityMah, aodEnabled, aodChargingOnly, aodBrightness, popupEnabled, popupStyle, popupDelayMs]);
+  }, [tplIndex, accent, fontId, glow, showTelemetry, clockStyle, bgId, bgDim, clockPos, batPos, sigPos, clockScale, batScale, sigScale, sigText, showSig, capacityMah, aodEnabled, aodChargingOnly, aodTimeoutSec, aodBrightness, popupEnabled, popupStyle, popupDelayMs]);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const syncClock = () => {
+      if (document.hidden) return;
+      const d = new Date();
+      setNow((prev) => (prev.getMinutes() === d.getMinutes() && prev.getHours() === d.getHours() ? prev : d));
+    };
+    const id = setInterval(syncClock, 10000);
+    document.addEventListener('visibilitychange', syncClock);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', syncClock);
+    };
   }, []);
 
   useEffect(() => {
@@ -869,6 +894,26 @@ function BatteryApp({ onExitHome }) {
                     <button className="opt-btn active" style={{ padding: '6px 12px' }} onClick={() => setAodChargingOnly((v) => !v)}>
                       {aodChargingOnly ? 'Charging Only' : 'Always on Lock'}
                     </button>
+                  </div>
+                  <div className="toggle-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>AOD Auto-Timeout (Battery Saver)</span>
+                      <span className="tabular" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {aodTimeoutSec > 0 ? `${aodTimeoutSec}s` : 'Always'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
+                      {AOD_TIMEOUT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.sec}
+                          className={`opt-btn ${aodTimeoutSec === opt.sec ? 'active' : ''}`}
+                          style={{ padding: '6px 0', fontSize: 11 }}
+                          onClick={() => setAodTimeoutSec(opt.sec)}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="toggle-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
