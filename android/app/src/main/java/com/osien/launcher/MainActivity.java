@@ -797,17 +797,36 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 int plugged = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) : 0;
 
                 long currentRaw = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) : Long.MIN_VALUE;
+                long currentAvgRaw = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE) : Long.MIN_VALUE;
                 long chargeCounterUah = bm != null ? bm.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER) : Long.MIN_VALUE;
-                double currentMa = currentRaw != Long.MIN_VALUE ? Math.abs(currentRaw) / 1000.0 : -1;
+                long chargeTimeRemainingMs = -1;
+                if (bm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    try {
+                        chargeTimeRemainingMs = bm.computeChargeTimeRemaining();
+                    } catch (Exception ignored) {}
+                }
+
+                // Auto-normalize OEM current units: standard Android reports uA, some OEMs report mA
+                double currentMa = -1;
+                if (currentRaw != Long.MIN_VALUE && currentRaw != 0) {
+                    long absNow = Math.abs(currentRaw);
+                    currentMa = (absNow > 10000) ? (absNow / 1000.0) : (double) absNow;
+                }
+                double currentAvgMa = -1;
+                if (currentAvgRaw != Long.MIN_VALUE && currentAvgRaw != 0) {
+                    long absAvg = Math.abs(currentAvgRaw);
+                    currentAvgMa = (absAvg > 10000) ? (absAvg / 1000.0) : (double) absAvg;
+                }
 
                 double pct = (level >= 0 && scale > 0) ? (level * 100.0 / scale) : -1;
 
                 // Smart Charging / Battery Protection detection (e.g. stops at 80% or 85% while plugged in)
                 boolean isPlugged = plugged > 0;
                 boolean isFull = status == BatteryManager.BATTERY_STATUS_FULL || pct >= 100.0;
+                double effectiveMa = currentMa > 0 ? currentMa : currentAvgMa;
                 boolean isSmartPaused = isPlugged && !isFull && (
                     status == BatteryManager.BATTERY_STATUS_NOT_CHARGING ||
-                    (pct >= 79.0 && currentRaw != Long.MIN_VALUE && currentRaw != 0 && currentMa <= 25.0)
+                    (pct >= 79.0 && effectiveMa >= 0 && effectiveMa <= 25.0)
                 );
                 boolean charging = (status == BatteryManager.BATTERY_STATUS_CHARGING) && !isSmartPaused && !isFull;
 
@@ -823,7 +842,9 @@ public class MainActivity extends BridgeActivity implements SensorEventListener 
                 json.put("chargeState", chargeState);
                 json.put("voltageV", voltageMv / 1000.0);
                 json.put("currentMa", currentMa);
+                json.put("currentAvgMa", currentAvgMa);
                 json.put("chargeCounterUah", chargeCounterUah);
+                json.put("chargeTimeRemainingMs", chargeTimeRemainingMs);
                 json.put("tempC", tempTenths / 10.0);
                 json.put("inPocket", isInPocket);
                 return json.toString();
